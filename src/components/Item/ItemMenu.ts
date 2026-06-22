@@ -2,8 +2,10 @@ import update from 'immutability-helper';
 import { Menu, Platform, TFile, TFolder } from 'obsidian';
 import { Dispatch, StateUpdater, useCallback } from 'preact/hooks';
 import { StateManager } from 'src/StateManager';
+import { addColorMenuItem } from 'src/components/ColorPickerPopover';
 import { Path } from 'src/dnd/types';
 import { moveEntity } from 'src/dnd/util/data';
+import { getCardConfig } from 'src/helpers/swimlanes';
 import { t } from 'src/lang/helpers';
 
 import { BoardModifiers } from '../../helpers/boardModifiers';
@@ -43,6 +45,7 @@ export function useItemMenu({
       const coordinates = { x: e.clientX, y: e.clientY };
       const hasDate = !!item.data.metadata.date;
       const hasTime = !!item.data.metadata.time;
+      const cardConfig = getCardConfig(stateManager.state, item);
 
       const menu = new Menu().addItem((i) => {
         i.setIcon('lucide-edit')
@@ -184,6 +187,54 @@ export function useItemMenu({
           i.setIcon('lucide-trash-2')
             .setTitle(t('Delete card'))
             .onClick(() => boardModifiers.deleteEntity(path));
+        })
+        .addSeparator();
+
+      addColorMenuItem(
+        menu,
+        'Set card color',
+        cardConfig?.color,
+        '#64748b',
+        (color) => boardModifiers.setCardColor(path, color),
+        () => boardModifiers.setCardColor(path, '')
+      );
+
+      menu
+        .addItem((item) => {
+          const submenu = (item as any)
+            .setTitle('Card display')
+            .setIcon('lucide-gallery-vertical-end')
+            .setSubmenu();
+
+          submenu
+            .addItem((i: any) =>
+              i
+                .setIcon('lucide-minimize-2')
+                .setChecked((cardConfig?.displayMode || 'compact') === 'compact')
+                .setTitle('Compact')
+                .onClick(() => boardModifiers.setCardDisplayMode(path, 'compact'))
+            )
+            .addItem((i: any) =>
+              i
+                .setIcon('lucide-panel-bottom')
+                .setChecked(cardConfig?.displayMode === 'preview')
+                .setTitle('Preview')
+                .onClick(() => boardModifiers.setCardDisplayMode(path, 'preview'))
+            )
+            .addItem((i: any) =>
+              i
+                .setIcon('lucide-expand')
+                .setChecked(cardConfig?.displayMode === 'expanded')
+                .setTitle('Expanded')
+                .onClick(() => {
+                  boardModifiers.setCardDisplayMode(path, 'expanded');
+                  boardModifiers.setCardPreviewSize(
+                    path,
+                    cardConfig?.previewWidth || 420,
+                    cardConfig?.previewHeight || 360
+                  );
+                })
+            );
         })
         .addSeparator()
         .addItem((i) => {

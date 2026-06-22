@@ -12,6 +12,7 @@ import {
 import { Droppable, useNestedEntityPath } from 'src/dnd/components/Droppable';
 import { DndManagerContext } from 'src/dnd/components/context';
 import { useDragHandle } from 'src/dnd/managers/DragManager';
+import { getCardConfig } from 'src/helpers/swimlanes';
 import { frontmatterKey } from 'src/parsers/common';
 
 import { KanbanContext, SearchContext } from '../context';
@@ -141,6 +142,7 @@ export const DraggableItem = memo(function DraggableItem(props: DraggableItemPro
   const elementRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
   const search = useContext(SearchContext);
+  const { stateManager } = useContext(KanbanContext);
 
   const { itemIndex, ...innerProps } = props;
 
@@ -148,6 +150,11 @@ export const DraggableItem = memo(function DraggableItem(props: DraggableItemPro
 
   const isMatch = search?.query ? innerProps.item.data.titleSearch.includes(search.query) : false;
   const classModifiers: string[] = getItemClassModifiers(innerProps.item);
+  const cardConfig = getCardConfig(stateManager.state, innerProps.item);
+  const itemStyle = {
+    '--card-color': cardConfig?.color,
+    '--card-width': cardConfig?.previewWidth ? `${cardConfig.previewWidth}px` : undefined,
+  } as any;
 
   return (
     <div
@@ -156,6 +163,7 @@ export const DraggableItem = memo(function DraggableItem(props: DraggableItemPro
         bindHandle(el);
       }}
       className={c('item-wrapper')}
+      style={itemStyle}
     >
       <div ref={elementRef} className={classcat([c('item'), ...classModifiers])}>
         {props.isStatic ? (

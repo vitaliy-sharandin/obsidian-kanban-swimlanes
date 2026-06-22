@@ -20,6 +20,7 @@ import { Board } from './components/types';
 import { getParentWindow } from './dnd/util/getWindow';
 import { gotoNextDailyNote, gotoPrevDailyNote, hasFrontmatterKeyRaw } from './helpers';
 import { bindMarkdownEvents } from './helpers/renderMarkdown';
+import { convertBoardToSwimlanes, isSwimlaneBoard } from './helpers/swimlanes';
 import { PromiseQueue } from './helpers/util';
 import { t } from './lang/helpers';
 import KanbanPlugin from './main';
@@ -349,6 +350,19 @@ export class KanbanView extends TextFileView implements HoverParent {
             stateManager.archiveCompletedCards();
           });
       });
+
+    const stateManager = this.plugin.stateManagers.get(this.file);
+    if (stateManager && !isSwimlaneBoard(stateManager.state)) {
+      menu.addItem((item) => {
+        item
+          .setTitle('Convert to swimlanes')
+          .setIcon('lucide-panel-top')
+          .setSection('pane')
+          .onClick(() => {
+            stateManager.setState((board) => convertBoardToSwimlanes(board));
+          });
+      });
+    }
 
     if (callSuper) {
       super.onPaneMenu(menu, source);

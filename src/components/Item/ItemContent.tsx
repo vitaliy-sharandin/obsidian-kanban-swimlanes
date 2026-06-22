@@ -8,10 +8,12 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
 } from 'preact/hooks';
 import { StateManager } from 'src/StateManager';
 import { useNestedEntityPath } from 'src/dnd/components/Droppable';
 import { Path } from 'src/dnd/types';
+import { getCardConfig } from 'src/helpers/swimlanes';
 import { getTaskStatusDone, toggleTaskString } from 'src/parsers/helpers/inlineMetadata';
 
 import { MarkdownEditor, allowNewLine } from '../Editor/MarkdownEditor';
@@ -123,6 +125,196 @@ function checkCheckbox(stateManager: StateManager, title: string, checkboxIndex:
   return results.join('\n');
 }
 
+function NotePreview({
+  item,
+  path,
+}: {
+  item: Item;
+  path: Path;
+}) {
+  const { stateManager, boardModifiers } = useContext(KanbanContext);
+  const cardConfig = getCardConfig(stateManager.state, item);
+  const mode = cardConfig?.displayMode || 'compact';
+  const saveTimerRef = useRef<number | null>(null);
+  const draftRef = useRef('');
+  const [isPreviewEditing, setIsPreviewEditing] = useState(false);
+  const file =
+    item.data.metadata.file ||
+    (item.data.metadata.fileAccessor
+      ? stateManager.app.metadataCache.getFirstLinkpathDest(
+          item.data.metadata.fileAccessor.target,
+          stateManager.file.path
+        )
+      : null);
+  const [markdown, setMarkdown] = useState<string | null>(null);
+  const [size, setSize] = useState({
+    width: cardConfig?.previewWidth || (mode === 'expanded' ? 420 : 280),
+    height: cardConfig?.previewHeight || (mode === 'expanded' ? 360 : 180),
+  });
+
+  useEffect(() => {
+    setSize({
+      width: cardConfig?.previewWidth || (mode === 'expanded' ? 420 : 280),
+      height: cardConfig?.previewHeight || (mode === 'expanded' ? 360 : 180),
+    });
+  }, [cardConfig?.previewWidth, cardConfig?.previewHeight, mode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (mode === 'compact') {
+      setMarkdown(null);
+      setIsPreviewEditing(false);
+      return;
+    }
+
+    if (!file) {
+      draftRef.current = item.data.titleRaw;
+      setMarkdown(item.data.titleRaw);
+      return;
+    }
+
+    stateManager.app.vault.cachedRead(file).then((content) => {
+      if (!cancelled) {
+        draftRef.current = content;
+        setMarkdown(content);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [file, item.data.titleRaw, mode, stateManager]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const saveLinkedNote = useCallback(
+    (content: string) => {
+      draftRef.current = content;
+      if (!file) return;
+
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+      }
+
+      saveTimerRef.current = window.setTimeout(() => {
+        saveTimerRef.current = null;
+        stateManager.app.vault.modify(file, draftRef.current);
+      }, 600);
+    },
+    [file, stateManager]
+  );
+
+  const flushLinkedNote = useCallback(() => {
+    if (file) {
+      stateManager.app.vault.modify(file, draftRef.current);
+    }
+  }, [file, stateManager]);
+
+  const startResize = useCallback(
+    (event: PointerEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const win = event.view;
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const startWidth = size.width;
+      const startHeight = size.height;
+      let nextSize = size;
+
+      const onMove = (moveEvent: PointerEvent) => {
+        nextSize = {
+          width: Math.max(220, startWidth + moveEvent.clientX - startX),
+          height: Math.max(120, startHeight + moveEvent.clientY - startY),
+        };
+        setSize(nextSize);
+      };
+
+      const onEnd = () => {
+        win.removeEventListener('pointermove', onMove);
+        win.removeEventListener('pointerup', onEnd);
+        win.removeEventListener('pointercancel', onEnd);
+        boardModifiers.setCardPreviewSize(path, nextSize.width, nextSize.height);
+      };
+
+      win.addEventListener('pointermove', onMove);
+      win.addEventListener('pointerup', onEnd);
+      win.addEventListener('pointercancel', onEnd);
+    },
+    [boardModifiers, path, size]
+  );
+
+  if (mode === 'compact') return null;
+
+  return (
+    <div
+      className={c('note-preview-card')}
+      style={
+        {
+          '--note-preview-width': `${size.width}px`,
+          '--note-preview-height': `${size.height}px`,
+        } as any
+      }
+    >
+      {file ? (
+        markdown === null ? (
+          <div className={c('note-preview-content')} />
+        ) : isPreviewEditing ? (
+          <div className={c('note-preview-editor')} data-ignore-drag={true}>
+            <textarea
+              key={`${file.path}-${mode}`}
+              className={c('note-preview-input')}
+              value={markdown}
+              autoFocus={true}
+              onInput={(event) => {
+                const value = (event.currentTarget as HTMLTextAreaElement).value;
+                setMarkdown(value);
+                saveLinkedNote(value);
+              }}
+              onBlur={() => {
+                flushLinkedNote();
+                setIsPreviewEditing(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  flushLinkedNote();
+                  setIsPreviewEditing(false);
+                }
+              }}
+            />
+          </div>
+        ) : (
+          <MarkdownRenderer
+            entityId={`${item.id}-note-preview`}
+            className={c('note-preview-content')}
+            markdownString={markdown}
+            data-ignore-drag={true}
+            onDblClick={() => setIsPreviewEditing(true)}
+          />
+        )
+      ) : (
+        <MarkdownRenderer
+          entityId={`${item.id}-note-preview`}
+          className={c('note-preview-content')}
+          markdownString={markdown || ''}
+        />
+      )}
+      <div
+        className={c('note-preview-resize')}
+        data-ignore-drag={true}
+        onPointerDown={startResize as any}
+      />
+    </div>
+  );
+}
+
 export function Tags({
   tags,
   searchQuery,
@@ -191,6 +383,7 @@ export const ItemContent = memo(function ItemContent({
   const { stateManager, filePath, boardModifiers } = useContext(KanbanContext);
   const getDateColor = useGetDateColorFn(stateManager);
   const titleRef = useRef<string | null>(null);
+  const cardConfig = getCardConfig(stateManager.state, item);
 
   useEffect(() => {
     if (editState === EditingState.complete) {
@@ -306,6 +499,7 @@ export const ItemContent = memo(function ItemContent({
           <Tags tags={item.data.metadata.tags} searchQuery={searchQuery} />
         </div>
       )}
+      <NotePreview item={item} path={path} />
     </div>
   );
 });

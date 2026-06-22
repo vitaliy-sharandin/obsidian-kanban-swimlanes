@@ -16,6 +16,25 @@ import {
 
 import { generateInstanceId } from '../components/helpers';
 import { Board, DataTypes, Item, Lane } from '../components/types';
+import {
+  addColumn,
+  addSwimlane,
+  deleteColumn,
+  deleteSwimlane,
+  getCardId,
+  renameColumn,
+  renameSwimlane,
+  reorderColumn,
+  reorderColumnTo,
+  reorderSwimlane,
+  reorderSwimlaneTo,
+  setCardColor,
+  setCardDisplayMode,
+  setCardPreviewSize,
+  setColumnColor,
+  setSwimlaneColor,
+  setSwimlaneCollapsed,
+} from './swimlanes';
 
 export interface BoardModifiers {
   appendItems: (path: Path, items: Item[]) => void;
@@ -34,6 +53,24 @@ export interface BoardModifiers {
   updateItem: (path: Path, item: Item) => void;
   archiveItem: (path: Path) => void;
   duplicateEntity: (path: Path) => void;
+  addSwimlane: (title: string) => void;
+  addColumn: (title: string) => void;
+  renameSwimlane: (swimlaneId: string, title: string) => void;
+  renameColumn: (columnId: string, title: string) => void;
+  deleteSwimlane: (swimlaneId: string) => void;
+  deleteColumn: (columnId: string) => void;
+  deleteSwimlaneAndMove: (swimlaneId: string, moveToSwimlaneId?: string) => void;
+  deleteColumnAndMove: (columnId: string, moveToColumnId?: string) => void;
+  reorderSwimlane: (swimlaneId: string, direction: -1 | 1) => void;
+  reorderColumn: (columnId: string, direction: -1 | 1) => void;
+  reorderSwimlaneTo: (sourceSwimlaneId: string, targetSwimlaneId: string) => void;
+  reorderColumnTo: (sourceColumnId: string, targetColumnId: string) => void;
+  setSwimlaneCollapsed: (swimlaneId: string, collapsed: boolean) => void;
+  setSwimlaneColor: (swimlaneId: string, color: string) => void;
+  setColumnColor: (columnId: string, color: string) => void;
+  setCardColor: (path: Path, color: string) => void;
+  setCardDisplayMode: (path: Path, displayMode: 'compact' | 'preview' | 'expanded') => void;
+  setCardPreviewSize: (path: Path, width: number, height: number) => void;
 }
 
 export function getBoardModifiers(view: KanbanView, stateManager: StateManager): BoardModifiers {
@@ -52,6 +89,40 @@ export function getBoardModifiers(view: KanbanView, stateManager: StateManager):
 
     const titleRaw = newTitle.join(' ');
     return stateManager.updateItemContent(item, titleRaw);
+  };
+
+  const ensureItemBlockId = (boardData: Board, path: Path) => {
+    let item = getEntityFromPath(boardData, path) as Item;
+    if (!item.data.blockId) {
+      item = update(item, {
+        data: {
+          blockId: {
+            $set: generateInstanceId(6),
+          },
+        },
+      });
+      boardData = updateParentEntity(boardData, path, {
+        children: {
+          [path[path.length - 1]]: {
+            $set: stateManager.updateItemContent(item, item.data.titleRaw),
+          },
+        },
+      });
+      item = getEntityFromPath(boardData, path) as Item;
+    }
+
+    return { boardData, item };
+  };
+
+  const touchItem = (boardData: Board, path: Path) => {
+    const item = getEntityFromPath(boardData, path) as Item;
+    return updateParentEntity(boardData, path, {
+      children: {
+        [path[path.length - 1]]: {
+          $set: { ...item },
+        },
+      },
+    });
   };
 
   return {
@@ -274,6 +345,95 @@ export function getBoardModifiers(view: KanbanView, stateManager: StateManager):
         }
 
         return insertEntity(boardData, path, [entityWithNewID]);
+      });
+    },
+
+    addSwimlane: (title: string) => {
+      stateManager.setState((boardData) => addSwimlane(boardData, title));
+    },
+
+    addColumn: (title: string) => {
+      stateManager.setState((boardData) => addColumn(boardData, title));
+    },
+
+    renameSwimlane: (swimlaneId: string, title: string) => {
+      stateManager.setState((boardData) => renameSwimlane(boardData, swimlaneId, title));
+    },
+
+    renameColumn: (columnId: string, title: string) => {
+      stateManager.setState((boardData) => renameColumn(boardData, columnId, title));
+    },
+
+    deleteSwimlane: (swimlaneId: string) => {
+      stateManager.setState((boardData) => deleteSwimlane(boardData, swimlaneId));
+    },
+
+    deleteColumn: (columnId: string) => {
+      stateManager.setState((boardData) => deleteColumn(boardData, columnId));
+    },
+
+    deleteSwimlaneAndMove: (swimlaneId: string, moveToSwimlaneId?: string) => {
+      stateManager.setState((boardData) => deleteSwimlane(boardData, swimlaneId, moveToSwimlaneId));
+    },
+
+    deleteColumnAndMove: (columnId: string, moveToColumnId?: string) => {
+      stateManager.setState((boardData) => deleteColumn(boardData, columnId, moveToColumnId));
+    },
+
+    reorderSwimlane: (swimlaneId: string, direction: -1 | 1) => {
+      stateManager.setState((boardData) => reorderSwimlane(boardData, swimlaneId, direction));
+    },
+
+    reorderColumn: (columnId: string, direction: -1 | 1) => {
+      stateManager.setState((boardData) => reorderColumn(boardData, columnId, direction));
+    },
+
+    reorderSwimlaneTo: (sourceSwimlaneId: string, targetSwimlaneId: string) => {
+      stateManager.setState((boardData) =>
+        reorderSwimlaneTo(boardData, sourceSwimlaneId, targetSwimlaneId)
+      );
+    },
+
+    reorderColumnTo: (sourceColumnId: string, targetColumnId: string) => {
+      stateManager.setState((boardData) => reorderColumnTo(boardData, sourceColumnId, targetColumnId));
+    },
+
+    setSwimlaneCollapsed: (swimlaneId: string, collapsed: boolean) => {
+      stateManager.setState((boardData) => setSwimlaneCollapsed(boardData, swimlaneId, collapsed));
+    },
+
+    setSwimlaneColor: (swimlaneId: string, color: string) => {
+      stateManager.setState((boardData) => setSwimlaneColor(boardData, swimlaneId, color));
+    },
+
+    setColumnColor: (columnId: string, color: string) => {
+      stateManager.setState((boardData) => setColumnColor(boardData, columnId, color));
+    },
+
+    setCardColor: (path: Path, color: string) => {
+      stateManager.setState((boardData) => {
+        const result = ensureItemBlockId(boardData, path);
+        return touchItem(setCardColor(result.boardData, getCardId(result.item), color), path);
+      });
+    },
+
+    setCardDisplayMode: (path: Path, displayMode: 'compact' | 'preview' | 'expanded') => {
+      stateManager.setState((boardData) => {
+        const result = ensureItemBlockId(boardData, path);
+        return touchItem(
+          setCardDisplayMode(result.boardData, getCardId(result.item), displayMode),
+          path
+        );
+      });
+    },
+
+    setCardPreviewSize: (path: Path, width: number, height: number) => {
+      stateManager.setState((boardData) => {
+        const result = ensureItemBlockId(boardData, path);
+        return touchItem(
+          setCardPreviewSize(result.boardData, getCardId(result.item), width, height),
+          path
+        );
       });
     },
   };

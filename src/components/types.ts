@@ -20,6 +20,41 @@ export interface LaneData {
   dom?: HTMLDivElement;
   forceEditMode?: boolean;
   sorted?: LaneSort | string;
+  swimlaneId?: string;
+  swimlaneTitle?: string;
+  swimlaneColor?: string;
+  swimlaneCollapsed?: boolean;
+  swimlaneOrder?: number;
+  columnId?: string;
+  columnTitle?: string;
+  columnColor?: string;
+  columnOrder?: number;
+  isSwimlaneCell?: boolean;
+}
+
+export interface SwimlaneConfig {
+  id: string;
+  title: string;
+  color?: string;
+  collapsed?: boolean;
+  order: number;
+}
+
+export interface ColumnConfig {
+  id: string;
+  title: string;
+  color?: string;
+  order: number;
+}
+
+export type CardDisplayMode = 'compact' | 'preview' | 'expanded';
+
+export interface CardConfig {
+  id: string;
+  color?: string;
+  displayMode?: CardDisplayMode;
+  previewHeight?: number;
+  previewWidth?: number;
 }
 
 export interface DataKey {

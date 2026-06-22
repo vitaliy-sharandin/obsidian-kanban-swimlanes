@@ -16,6 +16,8 @@ import {
   getDefaultTimeFormat,
 } from './components/helpers';
 import {
+  CardConfig,
+  ColumnConfig,
   DataKey,
   DateColor,
   DateColorSetting,
@@ -28,6 +30,7 @@ import {
   TagSort,
   TagSortSetting,
   TagSortSettingTemplate,
+  SwimlaneConfig,
 } from './components/types';
 import { getParentWindow } from './dnd/util/getWindow';
 import { t } from './lang/helpers';
@@ -55,6 +58,9 @@ export interface KanbanSettings {
   'archive-date-format'?: string;
   'archive-date-separator'?: string;
   'archive-with-date'?: boolean;
+  'kanban-format'?: 'swimlanes-v1';
+  cards?: CardConfig[];
+  columns?: ColumnConfig[];
   'date-colors'?: DateColor[];
   'date-display-format'?: string;
   'date-format'?: string;
@@ -84,6 +90,7 @@ export interface KanbanSettings {
   'show-search'?: boolean;
   'show-set-view'?: boolean;
   'show-view-as-markdown'?: boolean;
+  swimlanes?: SwimlaneConfig[];
   'table-sizing'?: Record<string, number>;
   'tag-action'?: 'kanban' | 'obsidian';
   'tag-colors'?: TagColor[];
@@ -103,6 +110,9 @@ export const settingKeyLookup: Set<keyof KanbanSettings> = new Set([
   'archive-date-format',
   'archive-date-separator',
   'archive-with-date',
+  'kanban-format',
+  'cards',
+  'columns',
   'date-colors',
   'date-display-format',
   'date-format',
@@ -132,6 +142,7 @@ export const settingKeyLookup: Set<keyof KanbanSettings> = new Set([
   'show-search',
   'show-set-view',
   'show-view-as-markdown',
+  'swimlanes',
   'table-sizing',
   'tag-action',
   'tag-colors',

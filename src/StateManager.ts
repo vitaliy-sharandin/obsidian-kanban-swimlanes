@@ -232,6 +232,10 @@ export class StateManager {
 
     this.compiledSettings = {
       [frontmatterKey]: this.getSettingRaw(frontmatterKey, suppliedSettings) || 'board',
+      'kanban-format': this.getSettingRaw('kanban-format', suppliedSettings),
+      cards: this.getSettingRaw('cards', suppliedSettings),
+      columns: this.getSettingRaw('columns', suppliedSettings),
+      swimlanes: this.getSettingRaw('swimlanes', suppliedSettings),
       'date-format': dateFormat,
       'date-display-format': dateDisplayFormat,
       'date-time-display-format': dateDisplayFormat + ' ' + timeFormat,

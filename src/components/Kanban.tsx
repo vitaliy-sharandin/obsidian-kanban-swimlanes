@@ -13,10 +13,12 @@ import { t } from 'src/lang/helpers';
 
 import { DndScope } from '../dnd/components/Scope';
 import { getBoardModifiers } from '../helpers/boardModifiers';
+import { isSwimlaneBoard } from '../helpers/swimlanes';
 import { frontmatterKey } from '../parsers/common';
 import { Icon } from './Icon/Icon';
 import { Lanes } from './Lane/Lane';
 import { LaneForm } from './Lane/LaneForm';
+import { SwimlaneBoard } from './Swimlanes/SwimlaneBoard';
 import { TableView } from './Table/Table';
 import { KanbanContext, SearchContext } from './context';
 import { baseClassName, c, useSearchValue } from './helpers';
@@ -202,6 +204,7 @@ export const Kanban = ({ view, stateManager }: KanbanProps) => {
   }
 
   const axis = boardView === 'list' ? 'vertical' : 'horizontal';
+  const isSwimlane = isSwimlaneBoard(boardData);
   const searchValue = useSearchValue(
     boardData,
     debouncedSearchQuery,
@@ -225,7 +228,7 @@ export const Kanban = ({ view, stateManager }: KanbanProps) => {
             ])}
             {...html5DragHandlers}
           >
-            {(isLaneFormVisible || boardData.children.length === 0) && (
+            {!isSwimlane && (isLaneFormVisible || boardData.children.length === 0) && (
               <LaneForm onNewLane={onNewLane} closeLaneForm={closeLaneForm} />
             )}
             {isSearching && (
@@ -261,8 +264,16 @@ export const Kanban = ({ view, stateManager }: KanbanProps) => {
                 </a>
               </div>
             )}
-            {boardView === 'table' ? (
+            {boardView === 'table' && !isSwimlane ? (
               <TableView boardData={boardData} stateManager={stateManager} />
+            ) : isSwimlane ? (
+              <ScrollContainer
+                id={view.id}
+                className={classcat([c('board'), c('swimlane-scroll')])}
+                triggerTypes={boardScrollTiggers}
+              >
+                <SwimlaneBoard boardData={boardData} />
+              </ScrollContainer>
             ) : (
               <ScrollContainer
                 id={view.id}
