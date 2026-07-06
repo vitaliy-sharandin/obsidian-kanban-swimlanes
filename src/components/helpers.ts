@@ -15,7 +15,7 @@ import {
 import { SearchContextProps } from './context';
 import { Board, DataKey, DateColor, Item, Lane, PageData, TagColor } from './types';
 
-export const baseClassName = 'kanban-plugin';
+export const baseClassName = 'kanban-swimlanes-plugin';
 
 export function noop() {}
 

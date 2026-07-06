@@ -6,7 +6,7 @@ import { KanbanSettings, settingKeyLookup } from 'src/Settings';
 import { StateManager } from 'src/StateManager';
 import { getNormalizedPath } from 'src/helpers/renderMarkdown';
 
-import { frontmatterKey, getLinkedPageMetadata } from './common';
+import { frontmatterKey, getLinkedPageMetadata, swimlaneFrontmatterKey } from './common';
 import { blockidExtension, blockidFromMarkdown } from './extensions/blockid';
 import { genericWrappedExtension, genericWrappedFromMarkdown } from './extensions/genericWrapped';
 import { internalMarkdownLinks } from './extensions/internalMarkdownLink';
@@ -174,6 +174,10 @@ export function parseMarkdown(stateManager: StateManager, md: string) {
     if (key === frontmatterKey) {
       const val = mdFrontmatter[key] === 'basic' ? 'board' : mdFrontmatter[key];
       settings[key] = val;
+      fileFrontmatter[key] = val;
+    } else if (key === swimlaneFrontmatterKey) {
+      const val = mdFrontmatter[key] === 'basic' ? 'board' : mdFrontmatter[key];
+      settings[frontmatterKey] = val;
       fileFrontmatter[key] = val;
     } else if (settingKeyLookup.has(key as keyof KanbanSettings)) {
       settings[key] = mdFrontmatter[key];

@@ -18,15 +18,18 @@ import { StateManager } from './StateManager';
 import { DateSuggest, TimeSuggest } from './components/Editor/suggest';
 import { getParentWindow } from './dnd/util/getWindow';
 import { hasFrontmatterKey } from './helpers';
-import { isSwimlaneBoard } from './helpers/swimlanes';
+import { isSwimlaneBoard, swimlanesFormat } from './helpers/swimlanes';
 import { t } from './lang/helpers';
-import { basicFrontmatter, frontmatterKey } from './parsers/common';
+import { frontmatterKey, swimlaneBoardTemplate, swimlaneFrontmatterKey } from './parsers/common';
 
 interface WindowRegistry {
   viewMap: Map<string, KanbanView>;
   viewStateReceivers: Array<(views: KanbanView[]) => void>;
   appRoot: HTMLElement;
 }
+
+const kanbanSwimlanesHoverSource = 'kanban-swimlanes';
+const originalKanbanPluginId = 'obsidian-kanban';
 
 function getEditorClass(app: any) {
   const md = app.embedRegistry.embedByExtension.md(
@@ -44,6 +47,10 @@ function getEditorClass(app: any) {
   md.unload();
 
   return MarkdownEditor;
+}
+
+function isOriginalKanbanPluginEnabled(app: any) {
+  return !!app.plugins?.enabledPlugins?.has(originalKanbanPluginId);
 }
 
 export default class KanbanPlugin extends Plugin {
@@ -99,7 +106,7 @@ export default class KanbanPlugin extends Plugin {
     this.windowRegistry.clear();
     this.kanbanFileModes = {};
 
-    (this.app.workspace as any).unregisterHoverLinkSource(frontmatterKey);
+    (this.app.workspace as any).unregisterHoverLinkSource(kanbanSwimlanesHoverSource);
   }
 
   MarkdownEditor: any;
@@ -153,8 +160,8 @@ export default class KanbanPlugin extends Plugin {
     this.registerDomEvent(window, 'keydown', this.handleShift);
     this.registerDomEvent(window, 'keyup', this.handleShift);
 
-    this.addRibbonIcon(kanbanIcon, t('Create new board'), () => {
-      this.newKanban();
+    this.addRibbonIcon(kanbanIcon, t('Create new Kanban swim board'), () => {
+      this.newKanbanSwimBoard();
     });
   }
 
@@ -345,7 +352,7 @@ export default class KanbanPlugin extends Plugin {
     } as ViewState);
   }
 
-  async newKanban(folder?: TFolder) {
+  async newKanbanSwimBoard(folder?: TFolder) {
     const targetFolder = folder
       ? folder
       : this.app.fileManager.getNewFileParent(app.workspace.getActiveFile()?.path || '');
@@ -353,10 +360,10 @@ export default class KanbanPlugin extends Plugin {
     try {
       const kanban: TFile = await (app.fileManager as any).createNewMarkdownFile(
         targetFolder,
-        t('Untitled Kanban')
+        t('Untitled Kanban swim board')
       );
 
-      await this.app.vault.modify(kanban, basicFrontmatter);
+      await this.app.vault.modify(kanban, swimlaneBoardTemplate);
       await this.app.workspace.getLeaf().setViewState({
         type: kanbanViewType,
         state: { file: kanban.path },
@@ -381,9 +388,9 @@ export default class KanbanPlugin extends Plugin {
           menu.addItem((item) => {
             item
               .setSection('action-primary')
-              .setTitle(t('New kanban board'))
+              .setTitle(t('New Kanban swim board'))
               .setIcon(kanbanIcon)
-              .onClick(() => this.newKanban(file));
+              .onClick(() => this.newKanbanSwimBoard(file));
           });
           return;
         }
@@ -409,7 +416,7 @@ export default class KanbanPlugin extends Plugin {
           if (!haveKanbanView) {
             menu.addItem((item) => {
               item
-                .setTitle(t('Open as kanban board'))
+                .setTitle(t('Open as Kanban swim board'))
                 .setIcon(kanbanIcon)
                 .setSection('pane')
                 .onClick(() => {
@@ -430,7 +437,7 @@ export default class KanbanPlugin extends Plugin {
         ) {
           menu.addItem((item) => {
             item
-              .setTitle(t('Open as kanban board'))
+              .setTitle(t('Open as Kanban swim board'))
               .setIcon(kanbanIcon)
               .setSection('pane')
               .onClick(() => {
@@ -580,17 +587,17 @@ export default class KanbanPlugin extends Plugin {
       })
     );
 
-    (app.workspace as any).registerHoverLinkSource(frontmatterKey, {
-      display: 'Kanban',
+    (app.workspace as any).registerHoverLinkSource(kanbanSwimlanesHoverSource, {
+      display: 'Kanban Swimlanes',
       defaultMod: true,
     });
   }
 
   registerCommands() {
     this.addCommand({
-      id: 'create-new-kanban-board',
-      name: t('Create new board'),
-      callback: () => this.newKanban(),
+      id: 'create-new-kanban-swim-board',
+      name: t('Create new Kanban swim board'),
+      callback: () => this.newKanbanSwimBoard(),
     });
 
     this.addCommand({
@@ -608,7 +615,7 @@ export default class KanbanPlugin extends Plugin {
 
     this.addCommand({
       id: 'toggle-kanban-view',
-      name: t('Toggle between Kanban and markdown mode'),
+      name: t('Toggle between Kanban swim board and markdown mode'),
       checkCallback: (checking) => {
         const activeFile = app.workspace.getActiveFile();
 
@@ -639,7 +646,7 @@ export default class KanbanPlugin extends Plugin {
 
     this.addCommand({
       id: 'convert-to-kanban',
-      name: t('Convert empty note to Kanban'),
+      name: t('Convert empty note to Kanban swim board'),
       checkCallback: (checking) => {
         const activeView = app.workspace.getActiveViewOfType(MarkdownView);
 
@@ -650,7 +657,7 @@ export default class KanbanPlugin extends Plugin {
         if (checking) return isFileEmpty;
         if (isFileEmpty) {
           app.vault
-            .modify(activeView.file, basicFrontmatter)
+            .modify(activeView.file, swimlaneBoardTemplate)
             .then(() => {
               this.setKanbanView(activeView.leaf);
             })
@@ -808,7 +815,17 @@ export default class KanbanPlugin extends Plugin {
               // Then check for the kanban frontMatterKey
               const cache = self.app.metadataCache.getCache(filePath);
 
-              if (cache?.frontmatter && cache.frontmatter[frontmatterKey]) {
+              const hasSwimlaneFrontmatter = !!cache?.frontmatter?.[swimlaneFrontmatterKey];
+              const hasLegacyKanbanFrontmatter = !!cache?.frontmatter?.[frontmatterKey];
+              const isSwimlaneFile =
+                hasSwimlaneFrontmatter ||
+                cache?.frontmatter?.['kanban-format'] === swimlanesFormat;
+              const shouldOpenWithSwimlanes =
+                hasSwimlaneFrontmatter ||
+                (hasLegacyKanbanFrontmatter &&
+                  (isSwimlaneFile || !isOriginalKanbanPluginEnabled(self.app)));
+
+              if (shouldOpenWithSwimlanes) {
                 // If we have it, force the view type to kanban
                 const newState = {
                   ...state,

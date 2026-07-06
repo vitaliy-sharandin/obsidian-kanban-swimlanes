@@ -31,7 +31,13 @@ import { defaultSort } from 'src/helpers/util';
 import { t } from 'src/lang/helpers';
 import { visit } from 'unist-util-visit';
 
-import { archiveString, completeString, settingsToCodeblock } from '../common';
+import {
+  archiveString,
+  completeString,
+  frontmatterKey,
+  settingsToCodeblock,
+  swimlaneFrontmatterKey,
+} from '../common';
 import { DateNode, FileNode, TimeNode, ValueNode } from '../extensions/types';
 import {
   ContentBoundary,
@@ -643,10 +649,16 @@ function swimlaneBoardToMd(board: Board) {
     }
   });
 
-  const frontmatterData = {
+  const frontmatterData: Record<string, any> = {
     ...board.data.frontmatter,
+    [swimlaneFrontmatterKey]:
+      board.data.frontmatter[swimlaneFrontmatterKey] ||
+      board.data.frontmatter[frontmatterKey] ||
+      board.data.settings[frontmatterKey] ||
+      'board',
     'kanban-format': swimlanesFormat,
   };
+  delete frontmatterData[frontmatterKey];
   const frontmatter = ['---', '', stringifyYaml(frontmatterData), '---', '', ''].join('\n');
 
   return (

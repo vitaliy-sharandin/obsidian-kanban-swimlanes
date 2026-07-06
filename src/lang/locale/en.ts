@@ -3,15 +3,22 @@
 const en = {
   // main.ts
   'Open as kanban board': 'Open as kanban board',
+  'Open as Kanban swim board': 'Open as Kanban swim board',
   'Create new board': 'Create new board',
+  'Create new Kanban swim board': 'Create new Kanban swim board',
   'Archive completed cards in active board': 'Archive completed cards in active board',
   'Error: current file is not a Kanban board': 'Error: current file is not a Kanban board',
   'Convert empty note to Kanban': 'Convert empty note to Kanban',
+  'Convert empty note to Kanban swim board': 'Convert empty note to Kanban swim board',
   'Error: cannot create Kanban, the current note is not empty':
     'Error: cannot create Kanban, the current note is not empty',
   'New kanban board': 'New kanban board',
+  'New Kanban swim board': 'New Kanban swim board',
   'Untitled Kanban': 'Untitled Kanban',
+  'Untitled Kanban swim board': 'Untitled Kanban swim board',
   'Toggle between Kanban and markdown mode': 'Toggle between Kanban and markdown mode',
+  'Toggle between Kanban swim board and markdown mode':
+    'Toggle between Kanban swim board and markdown mode',
 
   'View as board': 'View as board',
   'View as list': 'View as list',

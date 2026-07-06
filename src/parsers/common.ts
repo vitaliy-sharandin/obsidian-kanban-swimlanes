@@ -7,6 +7,7 @@ import { defaultSort } from 'src/helpers/util';
 import { t } from 'src/lang/helpers';
 
 export const frontmatterKey = 'kanban-plugin';
+export const swimlaneFrontmatterKey = 'kanban-swimlanes-plugin';
 
 export enum ParserFormats {
   List,
@@ -25,6 +26,22 @@ export const archiveString = '***';
 export const basicFrontmatter = ['---', '', `${frontmatterKey}: board`, '', '---', '', ''].join(
   '\n'
 );
+
+export const swimlaneBoardTemplate = [
+  '---',
+  `${swimlaneFrontmatterKey}: board`,
+  'kanban-format: swimlanes-v1',
+  '---',
+  '',
+  '# Swimlane',
+  '',
+  '## Todo',
+  '',
+  '## Doing',
+  '',
+  '## Done',
+  '',
+].join('\n');
 
 export function settingsToCodeblock(board: Board): string {
   return [
