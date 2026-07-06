@@ -2,6 +2,7 @@ type HTMLAttributes<T extends EventTarget> = import('preact/compat').HTMLAttribu
   AriaAttributes;
 
 declare const Fragment: import('preact').FunctionComponent<Record<string, never>>;
+declare const app: import('obsidian').App;
 
 declare function h(
   type: string,

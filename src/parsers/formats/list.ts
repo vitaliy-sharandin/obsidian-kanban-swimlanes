@@ -19,10 +19,10 @@ import {
 } from 'src/components/types';
 import { laneTitleWithMaxItems } from 'src/helpers';
 import {
-  defaultSwimlaneId,
   defaultSwimlaneTitle,
   ensureSwimlaneSettings,
   isSwimlaneBoard,
+  isImplicitDefaultSwimlane,
   normalizeSwimlaneBoard,
   slugId,
   swimlanesFormat,
@@ -610,10 +610,14 @@ function swimlaneBoardToMd(board: Board) {
   const settings = ensureSwimlaneSettings(board.data.settings, board);
   const swimlanes = settings.swimlanes || [];
   const columns = settings.columns || [];
+  const shouldOmitDefaultSwimlaneHeading =
+    swimlanes.length === 1 && isImplicitDefaultSwimlane(swimlanes[0]);
 
   swimlanes.forEach((swimlane) => {
-    lines.push(`# ${replaceNewLines(swimlane.title)}`);
-    lines.push('');
+    if (!shouldOmitDefaultSwimlaneHeading) {
+      lines.push(`# ${replaceNewLines(swimlane.title)}`);
+      lines.push('');
+    }
 
     columns.forEach((column) => {
       const lane = board.children.find(
@@ -634,7 +638,9 @@ function swimlaneBoardToMd(board: Board) {
       lines.push('');
     });
 
-    lines.push('');
+    if (!shouldOmitDefaultSwimlaneHeading) {
+      lines.push('');
+    }
   });
 
   const frontmatterData = {

@@ -384,13 +384,14 @@ export function useSearchValue(
       lanes,
       items,
       query,
-      search: (query, immediate) => {
+      search: (query, immediate, showSearchBar = true) => {
         if (!query) {
           setIsSearching(false);
           setSearchQuery('');
           setDebouncedSearchQuery('');
+          return;
         }
-        setIsSearching(true);
+        setIsSearching(showSearchBar);
         if (immediate) {
           setSearchQuery(query);
           setDebouncedSearchQuery(query);

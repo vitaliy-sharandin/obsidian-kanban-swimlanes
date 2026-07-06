@@ -19,7 +19,7 @@ export interface SearchContextProps {
   query: string;
   items: Set<Item>;
   lanes: Set<Lane>;
-  search: (query: string, immediate?: boolean) => void;
+  search: (query: string, immediate?: boolean, showSearchBar?: boolean) => void;
 }
 
 export const SearchContext = createContext<SearchContextProps | null>(null);

@@ -18,6 +18,7 @@ import { StateManager } from './StateManager';
 import { DateSuggest, TimeSuggest } from './components/Editor/suggest';
 import { getParentWindow } from './dnd/util/getWindow';
 import { hasFrontmatterKey } from './helpers';
+import { isSwimlaneBoard } from './helpers/swimlanes';
 import { t } from './lang/helpers';
 import { basicFrontmatter, frontmatterKey } from './parsers/common';
 
@@ -67,14 +68,22 @@ export default class KanbanPlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-  unload(): void {
-    super.unload();
-    Promise.all(
-      this.app.workspace.getLeavesOfType(kanbanViewType).map((leaf) => {
-        this.kanbanFileModes[(leaf as any).id] = 'markdown';
-        return this.setMarkdownView(leaf);
+  async unload(): Promise<void> {
+    const leaves = this.app.workspace.getLeavesOfType(kanbanViewType);
+
+    await Promise.all(
+      leaves.map((leaf) => {
+        const state = leaf.view?.getState();
+        const file = typeof state?.file === 'string' ? state.file : undefined;
+        this.kanbanFileModes[(leaf as any).id || file || ''] = 'markdown';
+
+        return this.setMarkdownView(leaf, false).catch((e) => {
+          console.error('Error unloading kanban view:', e);
+        });
       })
     );
+
+    super.unload();
   }
 
   onunload() {
@@ -450,6 +459,7 @@ export default class KanbanPlugin extends Plugin {
             const kanbanView = leaf.view as KanbanView;
             const boardView =
               kanbanView.viewSettings[frontmatterKey] || stateManager.getSetting(frontmatterKey);
+            const isSwimlane = isSwimlaneBoard(stateManager.state);
 
             menu
               .addItem((item) => {
@@ -482,35 +492,39 @@ export default class KanbanPlugin extends Plugin {
               })
               .addItem((item) =>
                 item
-                  .setTitle(t('View as board'))
-                  .setSection('pane')
-                  .setIcon('lucide-trello')
-                  .setChecked(boardView === 'basic' || boardView === 'board')
-                  .onClick(() => kanbanView.setView('board'))
-              )
-              .addItem((item) =>
-                item
-                  .setTitle(t('View as table'))
-                  .setSection('pane')
-                  .setIcon('lucide-table')
-                  .setChecked(boardView === 'table')
-                  .onClick(() => kanbanView.setView('table'))
-              )
-              .addItem((item) =>
-                item
-                  .setTitle(t('View as list'))
-                  .setSection('pane')
-                  .setIcon('lucide-server')
-                  .setChecked(boardView === 'list')
-                  .onClick(() => kanbanView.setView('list'))
-              )
-              .addItem((item) =>
-                item
                   .setTitle(t('Open board settings'))
                   .setSection('pane')
                   .setIcon('lucide-settings')
                   .onClick(() => kanbanView.getBoardSettings())
               );
+
+            if (!isSwimlane) {
+              menu
+                .addItem((item) =>
+                  item
+                    .setTitle(t('View as board'))
+                    .setSection('pane')
+                    .setIcon('lucide-trello')
+                    .setChecked(boardView === 'basic' || boardView === 'board')
+                    .onClick(() => kanbanView.setView('board'))
+                )
+                .addItem((item) =>
+                  item
+                    .setTitle(t('View as table'))
+                    .setSection('pane')
+                    .setIcon('lucide-table')
+                    .setChecked(boardView === 'table')
+                    .onClick(() => kanbanView.setView('table'))
+                )
+                .addItem((item) =>
+                  item
+                    .setTitle(t('View as list'))
+                    .setSection('pane')
+                    .setIcon('lucide-server')
+                    .setChecked(boardView === 'list')
+                    .onClick(() => kanbanView.setView('list'))
+                );
+            }
           }
         }
       })
@@ -779,17 +793,20 @@ export default class KanbanPlugin extends Plugin {
 
         setViewState(next) {
           return function (state: ViewState, ...rest: any[]) {
+            const file = (state.state as { file?: unknown } | undefined)?.file;
+            const filePath = typeof file === 'string' ? file : null;
+
             if (
               // Don't force kanban mode during shutdown
               self._loaded &&
               // If we have a markdown file
               state.type === 'markdown' &&
-              state.state?.file &&
+              filePath &&
               // And the current mode of the file is not set to markdown
-              self.kanbanFileModes[this.id || state.state.file] !== 'markdown'
+              self.kanbanFileModes[this.id || filePath] !== 'markdown'
             ) {
               // Then check for the kanban frontMatterKey
-              const cache = self.app.metadataCache.getCache(state.state.file);
+              const cache = self.app.metadataCache.getCache(filePath);
 
               if (cache?.frontmatter && cache.frontmatter[frontmatterKey]) {
                 // If we have it, force the view type to kanban
@@ -798,7 +815,7 @@ export default class KanbanPlugin extends Plugin {
                   type: kanbanViewType,
                 };
 
-                self.kanbanFileModes[state.state.file] = kanbanViewType;
+                self.kanbanFileModes[filePath] = kanbanViewType;
 
                 return next.apply(this, [newState, ...rest]);
               }

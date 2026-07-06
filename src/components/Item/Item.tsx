@@ -15,6 +15,7 @@ import { useDragHandle } from 'src/dnd/managers/DragManager';
 import { getCardConfig } from 'src/helpers/swimlanes';
 import { frontmatterKey } from 'src/parsers/common';
 
+import { Icon } from '../Icon/Icon';
 import { KanbanContext, SearchContext } from '../context';
 import { c } from '../helpers';
 import { EditState, EditingState, Item, isEditing } from '../types';
@@ -108,6 +109,22 @@ const ItemInner = memo(function ItemInner({
     return {};
   }, [editState]);
 
+  const cardConfig = getCardConfig(stateManager.state, item);
+  const displayMode = cardConfig?.displayMode || 'compact';
+  const setDisplayMode = useCallback(
+    (displayMode: 'compact' | 'expanded') => {
+      boardModifiers.setCardDisplayMode(path, displayMode);
+      if (displayMode === 'expanded') {
+        boardModifiers.setCardPreviewSize(
+          path,
+          cardConfig?.previewWidth || 420,
+          cardConfig?.previewHeight || 360
+        );
+      }
+    },
+    [boardModifiers, cardConfig?.previewHeight, cardConfig?.previewWidth, path]
+  );
+
   return (
     <div
       // eslint-disable-next-line react/no-unknown-property
@@ -132,6 +149,35 @@ const ItemInner = memo(function ItemInner({
           isStatic={isStatic}
         />
         <ItemMenuButton editState={editState} setEditState={setEditState} showMenu={showItemMenu} />
+        {!isEditing(editState) && (
+          <div className={c('card-display-controls')} data-ignore-drag={true}>
+            {[
+              ['compact', 'lucide-minimize-2', 'Compact'],
+              ['expanded', 'lucide-expand', 'Edit expanded'],
+            ].map(([mode, icon, label]) => (
+              <button
+                key={mode}
+                className={classcat([
+                  c('card-display-control'),
+                  { 'is-active': displayMode === mode },
+                ])}
+                aria-label={label}
+                title={label}
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setDisplayMode(mode as 'compact' | 'expanded');
+                }}
+              >
+                <Icon name={icon} />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <ItemMetadata searchQuery={isMatch ? searchQuery : undefined} item={item} />
     </div>

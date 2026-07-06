@@ -33,11 +33,13 @@ function scrollPlugin(): Plugin {
         }
 
         if (fp.yearElements) {
-          fp.yearElements.forEach((yearElem) => yearElem.addEventListener('wheel', scroll));
+          fp.yearElements.forEach((yearElem: HTMLInputElement) =>
+            yearElem.addEventListener('wheel', scroll)
+          );
         }
 
         if (fp.monthElements) {
-          fp.monthElements.forEach((monthElem) =>
+          fp.monthElements.forEach((monthElem: HTMLElement) =>
             monthElem.addEventListener('wheel', monthScroller)
           );
         }
@@ -50,11 +52,13 @@ function scrollPlugin(): Plugin {
         }
 
         if (fp.yearElements) {
-          fp.yearElements.forEach((yearElem) => yearElem.removeEventListener('wheel', scroll));
+          fp.yearElements.forEach((yearElem: HTMLInputElement) =>
+            yearElem.removeEventListener('wheel', scroll)
+          );
         }
 
         if (fp.monthElements) {
-          fp.monthElements.forEach((monthElem) =>
+          fp.monthElements.forEach((monthElem: HTMLElement) =>
             monthElem.removeEventListener('wheel', monthScroller)
           );
         }

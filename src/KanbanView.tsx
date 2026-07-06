@@ -396,7 +396,17 @@ export class KanbanView extends TextFileView implements HoverParent {
       delete this.actionButtons['show-board-settings'];
     }
 
-    if (stateManager.getSetting('show-set-view') && !this.actionButtons['show-set-view']) {
+    const isSwimlane = isSwimlaneBoard(stateManager.state);
+    const currentView = this.viewSettings[frontmatterKey] || stateManager.getSetting(frontmatterKey);
+    if (isSwimlane && currentView !== 'board' && currentView !== 'basic') {
+      this.setView('board');
+    }
+
+    if (
+      stateManager.getSetting('show-set-view') &&
+      !isSwimlane &&
+      !this.actionButtons['show-set-view']
+    ) {
       this.actionButtons['show-set-view'] = this.addAction(
         'lucide-view',
         t('Board view'),
@@ -427,7 +437,10 @@ export class KanbanView extends TextFileView implements HoverParent {
             .showAtMouseEvent(evt);
         }
       );
-    } else if (!stateManager.getSetting('show-set-view') && this.actionButtons['show-set-view']) {
+    } else if (
+      (!stateManager.getSetting('show-set-view') || isSwimlane) &&
+      this.actionButtons['show-set-view']
+    ) {
       this.actionButtons['show-set-view'].remove();
       delete this.actionButtons['show-set-view'];
     }

@@ -15,6 +15,8 @@ import { generateInstanceId } from 'src/components/helpers';
 export const swimlanesFormat = 'swimlanes-v1';
 export const defaultSwimlaneId = 'default';
 export const defaultSwimlaneTitle = 'Swimlane';
+export const defaultColumnId = 'default';
+export const defaultColumnTitle = 'Cards';
 export const unassignedSwimlaneId = 'unassigned';
 export const unassignedColumnId = 'unassigned';
 export const unassignedTitle = 'Unassigned';
@@ -34,6 +36,48 @@ export function slugId(title: string, fallback: string) {
     .replace(/^-+|-+$/g, '');
 
   return slug || fallback;
+}
+
+function uniqueConfigTitle<T extends SwimlaneConfig | ColumnConfig>(
+  title: string,
+  configs: T[],
+  currentId?: string
+) {
+  const used = new Set(
+    configs
+      .filter((config) => config.id !== currentId)
+      .map((config) => config.title.trim().toLocaleLowerCase())
+  );
+  let candidate = title.trim();
+  let index = 2;
+
+  while (used.has(candidate.toLocaleLowerCase())) {
+    candidate = `${title.trim()} ${index}`;
+    index += 1;
+  }
+
+  return candidate;
+}
+
+function uniqueConfigId<T extends SwimlaneConfig | ColumnConfig>(
+  title: string,
+  fallback: string,
+  configs: T[],
+  currentId?: string
+) {
+  const used = new Set(
+    configs.filter((config) => config.id !== currentId).map((config) => config.id)
+  );
+  const base = slugId(title, fallback);
+  let candidate = base;
+  let index = 2;
+
+  while (used.has(candidate)) {
+    candidate = `${base}-${index}`;
+    index += 1;
+  }
+
+  return candidate;
 }
 
 function dedupeConfig<T extends SwimlaneConfig | ColumnConfig>(configs: T[]) {
@@ -79,6 +123,26 @@ export function getColumnConfigs(board: Board): ColumnConfig[] {
     }));
 
   return sortConfig(dedupeConfig([...fromSettings, ...fromLanes]));
+}
+
+export function isImplicitDefaultSwimlane(swimlane: SwimlaneConfig) {
+  return swimlane.id === defaultSwimlaneId && swimlane.title === defaultSwimlaneTitle;
+}
+
+export function isImplicitDefaultColumn(column: ColumnConfig) {
+  return column.id === defaultColumnId && column.title === defaultColumnTitle;
+}
+
+export function getRenderableSwimlaneConfigs(board: Board): SwimlaneConfig[] {
+  const swimlanes = getSwimlaneConfigs(board);
+  if (swimlanes.length) return swimlanes;
+  return [{ id: defaultSwimlaneId, title: defaultSwimlaneTitle, order: 1000 }];
+}
+
+export function getRenderableColumnConfigs(board: Board): ColumnConfig[] {
+  const columns = getColumnConfigs(board);
+  if (columns.length) return columns;
+  return [{ id: defaultColumnId, title: defaultColumnTitle, order: 1000 }];
 }
 
 export function createCellLane(
@@ -132,8 +196,12 @@ export function getCardConfig(board: Board, item: Item): CardConfig | undefined 
 }
 
 export function normalizeSwimlaneBoard(board: Board): Board {
-  const swimlanes = getSwimlaneConfigs(board);
-  const columns = getColumnConfigs(board);
+  const configuredSwimlanes = getSwimlaneConfigs(board);
+  const configuredColumns = getColumnConfigs(board);
+  const swimlanes = configuredSwimlanes.length
+    ? configuredSwimlanes
+    : getRenderableSwimlaneConfigs(board);
+  const columns = configuredColumns.length ? configuredColumns : getRenderableColumnConfigs(board);
   const existing = new Map<string, Lane>();
 
   board.children.forEach((lane) => {
@@ -173,8 +241,8 @@ export function normalizeSwimlaneBoard(board: Board): Board {
         $set: {
           ...board.data.settings,
           'kanban-format': swimlanesFormat,
-          columns,
-          swimlanes,
+          columns: configuredColumns,
+          swimlanes: configuredSwimlanes,
         },
       },
     },
@@ -229,13 +297,57 @@ export function convertBoardToSwimlanes(board: Board) {
 }
 
 export function addSwimlane(board: Board, title: string) {
-  const columns = getColumnConfigs(board);
+  const columns = getRenderableColumnConfigs(board);
   const swimlanes = getSwimlaneConfigs(board);
-  const swimlane: SwimlaneConfig = {
-    id: slugId(title, `swimlane-${swimlanes.length + 1}`),
+  const shouldReplaceImplicitDefault =
+    swimlanes.length === 1 && isImplicitDefaultSwimlane(swimlanes[0]);
+  const swimlaneTitle = uniqueConfigTitle(
     title,
-    order: (swimlanes[swimlanes.length - 1]?.order || 0) + 1000,
+    swimlanes,
+    shouldReplaceImplicitDefault ? defaultSwimlaneId : undefined
+  );
+  const swimlane: SwimlaneConfig = {
+    id: uniqueConfigId(
+      swimlaneTitle,
+      `swimlane-${shouldReplaceImplicitDefault ? 1 : swimlanes.length + 1}`,
+      swimlanes,
+      shouldReplaceImplicitDefault ? defaultSwimlaneId : undefined
+    ),
+    title: swimlaneTitle,
+    order: shouldReplaceImplicitDefault
+      ? swimlanes[0].order || 1000
+      : (swimlanes[swimlanes.length - 1]?.order || 0) + 1000,
   };
+
+  if (shouldReplaceImplicitDefault) {
+    return normalizeSwimlaneBoard(
+      update(board, {
+        children: {
+          $set: board.children.map((lane) =>
+            lane.data.swimlaneId === defaultSwimlaneId
+              ? update(lane, {
+                  data: {
+                    swimlaneId: { $set: swimlane.id },
+                    swimlaneTitle: { $set: swimlane.title },
+                    swimlaneOrder: { $set: swimlane.order },
+                  },
+                })
+              : lane
+          ),
+        },
+        data: {
+          settings: {
+            $set: {
+              ...board.data.settings,
+              'kanban-format': swimlanesFormat,
+              columns,
+              swimlanes: [swimlane],
+            },
+          },
+        },
+      })
+    );
+  }
 
   return normalizeSwimlaneBoard(
     update(board, {
@@ -268,12 +380,57 @@ export function setSwimlaneCollapsed(board: Board, swimlaneId: string, collapsed
 
 export function addColumn(board: Board, title: string) {
   const columns = getColumnConfigs(board);
-  const swimlanes = getSwimlaneConfigs(board);
-  const column: ColumnConfig = {
-    id: slugId(title, `column-${columns.length + 1}`),
+  const swimlanes = getRenderableSwimlaneConfigs(board);
+  const shouldReplaceImplicitDefault =
+    columns.length === 1 && isImplicitDefaultColumn(columns[0]);
+  const columnTitle = uniqueConfigTitle(
     title,
-    order: (columns[columns.length - 1]?.order || 0) + 1000,
+    columns,
+    shouldReplaceImplicitDefault ? defaultColumnId : undefined
+  );
+  const column: ColumnConfig = {
+    id: uniqueConfigId(
+      columnTitle,
+      `column-${shouldReplaceImplicitDefault ? 1 : columns.length + 1}`,
+      columns,
+      shouldReplaceImplicitDefault ? defaultColumnId : undefined
+    ),
+    title: columnTitle,
+    order: shouldReplaceImplicitDefault
+      ? columns[0].order || 1000
+      : (columns[columns.length - 1]?.order || 0) + 1000,
   };
+
+  if (shouldReplaceImplicitDefault) {
+    return normalizeSwimlaneBoard(
+      update(board, {
+        children: {
+          $set: board.children.map((lane) =>
+            lane.data.columnId === defaultColumnId
+              ? update(lane, {
+                  data: {
+                    title: { $set: column.title },
+                    columnId: { $set: column.id },
+                    columnTitle: { $set: column.title },
+                    columnOrder: { $set: column.order },
+                  },
+                })
+              : lane
+          ),
+        },
+        data: {
+          settings: {
+            $set: {
+              ...board.data.settings,
+              'kanban-format': swimlanesFormat,
+              columns: [column],
+              swimlanes,
+            },
+          },
+        },
+      })
+    );
+  }
 
   return normalizeSwimlaneBoard(
     update(board, {
@@ -293,8 +450,9 @@ export function addColumn(board: Board, title: string) {
 }
 
 export function renameSwimlane(board: Board, swimlaneId: string, title: string) {
+  const nextTitle = uniqueConfigTitle(title, getSwimlaneConfigs(board), swimlaneId);
   const swimlanes = getSwimlaneConfigs(board).map((swimlane) =>
-    swimlane.id === swimlaneId ? { ...swimlane, title } : swimlane
+    swimlane.id === swimlaneId ? { ...swimlane, title: nextTitle } : swimlane
   );
 
   return normalizeSwimlaneBoard(
@@ -302,7 +460,7 @@ export function renameSwimlane(board: Board, swimlaneId: string, title: string) 
       children: {
         $set: board.children.map((lane) =>
           lane.data.swimlaneId === swimlaneId
-            ? update(lane, { data: { swimlaneTitle: { $set: title } } })
+            ? update(lane, { data: { swimlaneTitle: { $set: nextTitle } } })
             : lane
         ),
       },
@@ -312,8 +470,9 @@ export function renameSwimlane(board: Board, swimlaneId: string, title: string) 
 }
 
 export function renameColumn(board: Board, columnId: string, title: string) {
+  const nextTitle = uniqueConfigTitle(title, getColumnConfigs(board), columnId);
   const columns = getColumnConfigs(board).map((column) =>
-    column.id === columnId ? { ...column, title } : column
+    column.id === columnId ? { ...column, title: nextTitle } : column
   );
 
   return normalizeSwimlaneBoard(
@@ -323,8 +482,8 @@ export function renameColumn(board: Board, columnId: string, title: string) {
           lane.data.columnId === columnId
             ? update(lane, {
                 data: {
-                  title: { $set: title },
-                  columnTitle: { $set: title },
+                  title: { $set: nextTitle },
+                  columnTitle: { $set: nextTitle },
                 },
               })
             : lane
@@ -405,6 +564,37 @@ export function reorderSwimlaneTo(board: Board, sourceId: string, targetId: stri
   );
 }
 
+export function reorderSwimlaneToPlacement(
+  board: Board,
+  sourceId: string,
+  targetId: string,
+  placement: 'before' | 'after'
+) {
+  const swimlanes = getSwimlaneConfigs(board);
+  const sourceIndex = swimlanes.findIndex((swimlane) => swimlane.id === sourceId);
+  if (sourceIndex < 0 || sourceId === targetId) return board;
+
+  const reordered = [...swimlanes];
+  const [source] = reordered.splice(sourceIndex, 1);
+  const targetIndex = reordered.findIndex((swimlane) => swimlane.id === targetId);
+  if (targetIndex < 0) return board;
+
+  reordered.splice(targetIndex + (placement === 'after' ? 1 : 0), 0, source);
+
+  return normalizeSwimlaneBoard(
+    update(board, {
+      data: {
+        settings: {
+          $set: {
+            ...board.data.settings,
+            swimlanes: reordered.map((swimlane, i) => ({ ...swimlane, order: (i + 1) * 1000 })),
+          },
+        },
+      },
+    })
+  );
+}
+
 export function reorderColumn(board: Board, columnId: string, direction: -1 | 1) {
   const columns = getColumnConfigs(board);
   const index = columns.findIndex((column) => column.id === columnId);
@@ -436,6 +626,37 @@ export function reorderColumnTo(board: Board, sourceId: string, targetId: string
 
   const reordered = [...columns];
   reordered.splice(targetIndex, 0, reordered.splice(sourceIndex, 1)[0]);
+
+  return normalizeSwimlaneBoard(
+    update(board, {
+      data: {
+        settings: {
+          $set: {
+            ...board.data.settings,
+            columns: reordered.map((column, i) => ({ ...column, order: (i + 1) * 1000 })),
+          },
+        },
+      },
+    })
+  );
+}
+
+export function reorderColumnToPlacement(
+  board: Board,
+  sourceId: string,
+  targetId: string,
+  placement: 'before' | 'after'
+) {
+  const columns = getColumnConfigs(board);
+  const sourceIndex = columns.findIndex((column) => column.id === sourceId);
+  if (sourceIndex < 0 || sourceId === targetId) return board;
+
+  const reordered = [...columns];
+  const [source] = reordered.splice(sourceIndex, 1);
+  const targetIndex = reordered.findIndex((column) => column.id === targetId);
+  if (targetIndex < 0) return board;
+
+  reordered.splice(targetIndex + (placement === 'after' ? 1 : 0), 0, source);
 
   return normalizeSwimlaneBoard(
     update(board, {

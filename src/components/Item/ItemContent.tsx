@@ -217,6 +217,16 @@ function NotePreview({
     }
   }, [file, stateManager]);
 
+  const onPreviewEnter = useCallback(() => false, []);
+  const onPreviewEscape = useCallback(() => {
+    flushLinkedNote();
+    setIsPreviewEditing(false);
+  }, [flushLinkedNote]);
+  const onPreviewSubmit = useCallback(() => {
+    flushLinkedNote();
+    setIsPreviewEditing(false);
+  }, [flushLinkedNote]);
+
   const startResize = useCallback(
     (event: PointerEvent) => {
       event.preventDefault();
@@ -253,6 +263,8 @@ function NotePreview({
 
   if (mode === 'compact') return null;
 
+  const shouldEditInline = mode === 'expanded' || isPreviewEditing;
+
   return (
     <div
       className={c('note-preview-card')}
@@ -266,26 +278,21 @@ function NotePreview({
       {file ? (
         markdown === null ? (
           <div className={c('note-preview-content')} />
-        ) : isPreviewEditing ? (
+        ) : shouldEditInline ? (
           <div className={c('note-preview-editor')} data-ignore-drag={true}>
-            <textarea
+            <MarkdownEditor
               key={`${file.path}-${mode}`}
               className={c('note-preview-input')}
+              editState={{ x: 0, y: 0 }}
               value={markdown}
-              autoFocus={true}
-              onInput={(event) => {
-                const value = (event.currentTarget as HTMLTextAreaElement).value;
-                setMarkdown(value);
-                saveLinkedNote(value);
-              }}
-              onBlur={() => {
-                flushLinkedNote();
-                setIsPreviewEditing(false);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') {
-                  flushLinkedNote();
-                  setIsPreviewEditing(false);
+              onEnter={onPreviewEnter}
+              onEscape={onPreviewEscape}
+              onSubmit={onPreviewSubmit}
+              onChange={(update) => {
+                if (update.docChanged) {
+                  const value = update.state.doc.toString();
+                  setMarkdown(value);
+                  saveLinkedNote(value);
                 }
               }}
             />
@@ -383,7 +390,6 @@ export const ItemContent = memo(function ItemContent({
   const { stateManager, filePath, boardModifiers } = useContext(KanbanContext);
   const getDateColor = useGetDateColorFn(stateManager);
   const titleRef = useRef<string | null>(null);
-  const cardConfig = getCardConfig(stateManager.state, item);
 
   useEffect(() => {
     if (editState === EditingState.complete) {

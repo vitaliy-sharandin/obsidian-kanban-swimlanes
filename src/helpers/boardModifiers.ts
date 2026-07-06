@@ -26,8 +26,10 @@ import {
   renameSwimlane,
   reorderColumn,
   reorderColumnTo,
+  reorderColumnToPlacement,
   reorderSwimlane,
   reorderSwimlaneTo,
+  reorderSwimlaneToPlacement,
   setCardColor,
   setCardDisplayMode,
   setCardPreviewSize,
@@ -65,6 +67,16 @@ export interface BoardModifiers {
   reorderColumn: (columnId: string, direction: -1 | 1) => void;
   reorderSwimlaneTo: (sourceSwimlaneId: string, targetSwimlaneId: string) => void;
   reorderColumnTo: (sourceColumnId: string, targetColumnId: string) => void;
+  reorderSwimlaneToPlacement: (
+    sourceSwimlaneId: string,
+    targetSwimlaneId: string,
+    placement: 'before' | 'after'
+  ) => void;
+  reorderColumnToPlacement: (
+    sourceColumnId: string,
+    targetColumnId: string,
+    placement: 'before' | 'after'
+  ) => void;
   setSwimlaneCollapsed: (swimlaneId: string, collapsed: boolean) => void;
   setSwimlaneColor: (swimlaneId: string, color: string) => void;
   setColumnColor: (columnId: string, color: string) => void;
@@ -396,6 +408,26 @@ export function getBoardModifiers(view: KanbanView, stateManager: StateManager):
 
     reorderColumnTo: (sourceColumnId: string, targetColumnId: string) => {
       stateManager.setState((boardData) => reorderColumnTo(boardData, sourceColumnId, targetColumnId));
+    },
+
+    reorderSwimlaneToPlacement: (
+      sourceSwimlaneId: string,
+      targetSwimlaneId: string,
+      placement: 'before' | 'after'
+    ) => {
+      stateManager.setState((boardData) =>
+        reorderSwimlaneToPlacement(boardData, sourceSwimlaneId, targetSwimlaneId, placement)
+      );
+    },
+
+    reorderColumnToPlacement: (
+      sourceColumnId: string,
+      targetColumnId: string,
+      placement: 'before' | 'after'
+    ) => {
+      stateManager.setState((boardData) =>
+        reorderColumnToPlacement(boardData, sourceColumnId, targetColumnId, placement)
+      );
     },
 
     setSwimlaneCollapsed: (swimlaneId: string, collapsed: boolean) => {

@@ -175,7 +175,7 @@ function rangePlugin(config: Config = {}): Plugin {
           _prevDates = [...newDates];
         }
 
-        [fp._input.value = '', secondInput.value = ''] = fp.selectedDates.map((d) =>
+        [fp._input.value = '', secondInput.value = ''] = fp.selectedDates.map((d: Date) =>
           fp.formatDate(d, dateFormat)
         );
       },

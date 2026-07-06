@@ -1,7 +1,16 @@
 import animateScrollTo from 'animated-scroll-to';
 import classcat from 'classcat';
 import update from 'immutability-helper';
-import { Fragment, memo, useCallback, useContext, useMemo, useRef, useState } from 'preact/compat';
+import type { ComponentChildren } from 'preact';
+import {
+  Fragment,
+  memo,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from 'preact/compat';
 import {
   DraggableProps,
   Droppable,
@@ -19,7 +28,7 @@ import { Items } from '../Item/Item';
 import { ItemForm } from '../Item/ItemForm';
 import { KanbanContext, SearchContext, SortContext } from '../context';
 import { c, generateInstanceId } from '../helpers';
-import { DataTypes, EditState, EditingState, Item, Lane } from '../types';
+import { DataTypes, EditState, EditingState, Item, Lane, isEditing } from '../types';
 import { LaneHeader } from './LaneHeader';
 
 const laneAccepts = [DataTypes.Item];
@@ -30,6 +39,10 @@ export interface DraggableLaneProps {
   isStatic?: boolean;
   collapseDir: 'horizontal' | 'vertical';
   isCollapsed?: boolean;
+  renderActions?: (ctx: {
+    addItems: (items: Item[]) => void;
+    setEditState: (editState: EditState) => void;
+  }) => ComponentChildren;
 }
 
 function DraggableLaneRaw({
@@ -38,6 +51,7 @@ function DraggableLaneRaw({
   laneIndex,
   collapseDir,
   isCollapsed = false,
+  renderActions,
 }: DraggableLaneProps) {
   const [editState, setEditState] = useState<EditState>(EditingState.cancel);
   const [isSorting, setIsSorting] = useState(false);
@@ -206,9 +220,14 @@ function DraggableLaneRaw({
               </DroppableComponent>
             )}
 
-            {!search?.query && !isCollapsed && !shouldPrepend && (
-              <ItemForm addItems={addItems} editState={editState} setEditState={setEditState} />
-            )}
+            {!search?.query &&
+              !isCollapsed &&
+              !shouldPrepend &&
+              (renderActions && !isEditing(editState) ? (
+                renderActions({ addItems, setEditState })
+              ) : (
+                <ItemForm addItems={addItems} editState={editState} setEditState={setEditState} />
+              ))}
           </CollapsedDropArea>
         </div>
       </div>
