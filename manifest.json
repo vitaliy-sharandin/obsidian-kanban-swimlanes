@@ -1,11 +1,11 @@
 {
 	"id": "obsidian-kanban-swimlanes",
 	"name": "Kanban Swimlanes",
-	"version": "2.0.51",
+	"version": "1.0.0",
 	"minAppVersion": "1.0.0",
 	"description": "Create markdown-backed Kanban boards with horizontal swimlanes in Obsidian.",
-	"author": "mgmeyers",
-	"authorUrl": "https://github.com/mgmeyers/obsidian-kanban",
-	"helpUrl": "https://publish.obsidian.md/kanban/Obsidian+Kanban+Plugin",
+	"author": "vitaliy-sharandin",
+	"authorUrl": "https://github.com/vitaliy-sharandin/obsidian-kanban-swimlanes",
+	"helpUrl": "https://github.com/vitaliy-sharandin/obsidian-kanban-swimlanes",
 	"isDesktopOnly": false
 }
