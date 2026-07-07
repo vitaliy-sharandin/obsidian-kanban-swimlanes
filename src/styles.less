@@ -445,7 +445,7 @@ button.kanban-swimlanes-plugin__search-cancel-button .kanban-swimlanes-plugin__i
   display: flex;
   align-items: center;
   gap: 6px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: none;
 }
 
@@ -475,6 +475,30 @@ button.kanban-swimlanes-plugin__search-cancel-button .kanban-swimlanes-plugin__i
     background-color 120ms ease;
 }
 
+.kanban-swimlanes-plugin__swimlane-parent-frame {
+  position: relative;
+  z-index: 0;
+  min-width: 0;
+  min-height: 0;
+  align-self: stretch;
+  justify-self: stretch;
+  margin: -5px -2px;
+  border: 1px solid
+    color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 26%, transparent);
+  border-radius: 14px;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 8%, transparent),
+      color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 3%, transparent)
+    ),
+    color-mix(in srgb, var(--background-secondary) 10%, transparent);
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 50%, transparent),
+    0 8px 24px color-mix(in srgb, var(--background-primary) 18%, transparent);
+}
+
 .kanban-swimlanes-plugin__swimlane-column-frame {
   border: 1px solid
     color-mix(in srgb, var(--column-color, var(--background-modifier-border)) 34%, transparent);
@@ -498,6 +522,32 @@ button.kanban-swimlanes-plugin__search-cancel-button .kanban-swimlanes-plugin__i
       to right,
       color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 14%, transparent),
       color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 5%, transparent)
+    );
+}
+
+.kanban-swimlanes-plugin__swimlane-row-frame.has-sub-swimlanes {
+  border-left-width: 5px;
+  border-top-color: transparent;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 12px 0 0 12px;
+  background:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 10%, transparent),
+      transparent 46%
+    );
+}
+
+.kanban-swimlanes-plugin__swimlane-row-frame.is-sub-swimlane {
+  margin-inline-start: calc(14px + (var(--swimlane-depth, 0) * 10px));
+  border-left-width: 2px;
+  border-radius: 10px;
+  background:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 10%, transparent),
+      color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 3%, transparent)
     );
 }
 
@@ -572,9 +622,10 @@ button.kanban-swimlanes-plugin__search-cancel-button .kanban-swimlanes-plugin__i
   align-self: start;
   justify-self: stretch;
   width: 100%;
-  height: 34px;
+  height: auto;
   min-height: 34px;
   margin-block-start: 0;
+  padding-block: 6px;
   padding-inline: 12px;
   justify-content: center;
   color: color-mix(in srgb, var(--text-normal) 92%, var(--column-color, var(--text-normal)));
@@ -752,11 +803,12 @@ button.kanban-swimlanes-plugin__swimlane-row-header:focus-visible {
   left: 0;
   align-self: start;
   justify-self: stretch;
-  height: 34px;
+  height: auto;
   min-height: 34px;
   margin-block-start: 10px;
   margin-inline: 2px 10px;
   text-align: left;
+  padding-block: 6px;
   padding-inline: 9px 7px;
   justify-content: space-between;
   color: color-mix(in srgb, var(--text-normal) 90%, var(--swimlane-color, var(--text-normal)));
@@ -765,6 +817,30 @@ button.kanban-swimlanes-plugin__swimlane-row-header:focus-visible {
 
   &.is-collapsed {
     color: var(--text-muted);
+  }
+
+  &.is-sub-swimlane {
+    padding-inline-start: calc(9px + (var(--swimlane-depth, 0) * 18px));
+    opacity: 0.76;
+
+    .kanban-swimlanes-plugin__swimlane-header-title {
+      font-size: var(--font-ui-smaller);
+      font-weight: 600;
+    }
+
+    .kanban-swimlanes-plugin__swimlane-header-title::before {
+      content: '';
+      display: inline-block;
+      width: 9px;
+      height: 1px;
+      margin-inline-end: 7px;
+      vertical-align: middle;
+      background-color: color-mix(
+        in srgb,
+        var(--swimlane-color, var(--text-muted)) 58%,
+        transparent
+      );
+    }
   }
 }
 
@@ -793,9 +869,12 @@ button.kanban-swimlanes-plugin__swimlane-row-header:focus-visible {
 .kanban-swimlanes-plugin__swimlane-header-title {
   min-width: 0;
   flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.2;
 }
 
 .kanban-swimlanes-plugin__swimlane-column-header .kanban-swimlanes-plugin__swimlane-header-title {
@@ -938,6 +1017,63 @@ button.kanban-swimlanes-plugin__swimlane-row-header:focus-visible {
   .kanban-swimlanes-plugin__item-content-wrapper,
   .kanban-swimlanes-plugin__item-title-wrapper {
     background: transparent;
+  }
+
+  &.has-sub-swimlanes {
+    min-height: 26px;
+    padding-block: 0;
+
+    > .kanban-swimlanes-plugin__lane-wrapper,
+    .kanban-swimlanes-plugin__lane {
+      min-height: 26px;
+      height: auto;
+    }
+
+    .kanban-swimlanes-plugin__lane-items {
+      min-height: 0;
+      padding-block: 0;
+    }
+
+    .kanban-swimlanes-plugin__lane-items > .kanban-swimlanes-plugin__placeholder {
+      min-height: 0;
+      height: 0;
+      margin: 0;
+    }
+
+    .kanban-swimlanes-plugin__swimlane-cell-actions {
+      position: absolute;
+      inset-inline: 6px;
+      bottom: 2px;
+      min-height: 18px;
+      margin: 0;
+      padding: 0;
+    }
+  }
+
+  &.is-sub-swimlane {
+    min-height: 88px;
+
+    > .kanban-swimlanes-plugin__lane-wrapper,
+    .kanban-swimlanes-plugin__lane {
+      min-height: 88px;
+    }
+
+    .kanban-swimlanes-plugin__lane-items {
+      min-height: 32px;
+    }
+  }
+
+  &.has-sub-swimlanes.is-sub-swimlane {
+    min-height: 26px;
+
+    > .kanban-swimlanes-plugin__lane-wrapper,
+    .kanban-swimlanes-plugin__lane {
+      min-height: 26px;
+    }
+
+    .kanban-swimlanes-plugin__lane-items {
+      min-height: 0;
+    }
   }
 }
 

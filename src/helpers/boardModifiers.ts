@@ -55,7 +55,7 @@ export interface BoardModifiers {
   updateItem: (path: Path, item: Item) => void;
   archiveItem: (path: Path) => void;
   duplicateEntity: (path: Path) => void;
-  addSwimlane: (title: string) => void;
+  addSwimlane: (title: string, parentId?: string) => void;
   addColumn: (title: string) => void;
   renameSwimlane: (swimlaneId: string, title: string) => void;
   renameColumn: (columnId: string, title: string) => void;
@@ -70,7 +70,8 @@ export interface BoardModifiers {
   reorderSwimlaneToPlacement: (
     sourceSwimlaneId: string,
     targetSwimlaneId: string,
-    placement: 'before' | 'after'
+    placement: 'before' | 'after',
+    parentId?: string | null
   ) => void;
   reorderColumnToPlacement: (
     sourceColumnId: string,
@@ -360,8 +361,8 @@ export function getBoardModifiers(view: KanbanView, stateManager: StateManager):
       });
     },
 
-    addSwimlane: (title: string) => {
-      stateManager.setState((boardData) => addSwimlane(boardData, title));
+    addSwimlane: (title: string, parentId?: string) => {
+      stateManager.setState((boardData) => addSwimlane(boardData, title, parentId));
     },
 
     addColumn: (title: string) => {
@@ -413,10 +414,17 @@ export function getBoardModifiers(view: KanbanView, stateManager: StateManager):
     reorderSwimlaneToPlacement: (
       sourceSwimlaneId: string,
       targetSwimlaneId: string,
-      placement: 'before' | 'after'
+      placement: 'before' | 'after',
+      parentId?: string | null
     ) => {
       stateManager.setState((boardData) =>
-        reorderSwimlaneToPlacement(boardData, sourceSwimlaneId, targetSwimlaneId, placement)
+        reorderSwimlaneToPlacement(
+          boardData,
+          sourceSwimlaneId,
+          targetSwimlaneId,
+          placement,
+          parentId
+        )
       );
     },
 

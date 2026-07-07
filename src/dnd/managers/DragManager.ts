@@ -479,8 +479,11 @@ export function createHTMLDndHandlers(stateManager: StateManager) {
   const dndManager = useContext(DndManagerContext);
   const onDragOver = useCallback(
     (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
       if (dndManager.dragManager.isHTMLDragging) {
-        e.preventDefault();
         dndManager.dragManager.dragMoveHTML(e);
       } else {
         dndManager.dragManager.dragStartHTML(e, stateManager.getAView().id);
@@ -495,6 +498,10 @@ export function createHTMLDndHandlers(stateManager: StateManager) {
 
   const onDrop = useCallback(
     async (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
       dndManager.dragManager.dragEndHTML(
         e,
         stateManager.getAView().id,

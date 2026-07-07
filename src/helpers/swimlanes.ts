@@ -96,6 +96,100 @@ export function sortConfig<T extends SwimlaneConfig | ColumnConfig>(configs: T[]
   });
 }
 
+function sanitizeSwimlaneConfig(config: SwimlaneConfig, knownIds: Set<string>): SwimlaneConfig {
+  if (!config.parentId || config.parentId === config.id || !knownIds.has(config.parentId)) {
+    return {
+      ...config,
+      parentId: undefined,
+    };
+  }
+
+  return config;
+}
+
+export function sortSwimlaneConfigs(configs: SwimlaneConfig[]) {
+  const knownIds = new Set(configs.map((config) => config.id));
+  const sanitized = configs.map((config) => sanitizeSwimlaneConfig(config, knownIds));
+  const byParent = new Map<string, SwimlaneConfig[]>();
+  const visited = new Set<string>();
+  const result: SwimlaneConfig[] = [];
+
+  sanitized.forEach((config) => {
+    const parentKey = config.parentId || '';
+    const siblings = byParent.get(parentKey) || [];
+    siblings.push(config);
+    byParent.set(parentKey, siblings);
+  });
+
+  const appendChildren = (parentId: string) => {
+    const children = sortConfig(byParent.get(parentId) || []);
+    children.forEach((child) => {
+      if (visited.has(child.id)) return;
+      visited.add(child.id);
+      result.push(child);
+      appendChildren(child.id);
+    });
+  };
+
+  appendChildren('');
+
+  sortConfig(sanitized).forEach((config) => {
+    if (visited.has(config.id)) return;
+    visited.add(config.id);
+    result.push({ ...config, parentId: undefined });
+    appendChildren(config.id);
+  });
+
+  return result;
+}
+
+export function getSwimlaneDescendantIds(swimlanes: SwimlaneConfig[], swimlaneId: string): string[] {
+  const childrenByParent = new Map<string, SwimlaneConfig[]>();
+  swimlanes.forEach((swimlane) => {
+    if (!swimlane.parentId) return;
+    const children = childrenByParent.get(swimlane.parentId) || [];
+    children.push(swimlane);
+    childrenByParent.set(swimlane.parentId, children);
+  });
+
+  const result: string[] = [];
+  const collect = (parentId: string) => {
+    (childrenByParent.get(parentId) || []).forEach((child) => {
+      result.push(child.id);
+      collect(child.id);
+    });
+  };
+
+  collect(swimlaneId);
+  return result;
+}
+
+export function getSwimlaneDragGroupIds(swimlanes: SwimlaneConfig[], swimlaneId: string) {
+  return [swimlaneId, ...getSwimlaneDescendantIds(swimlanes, swimlaneId)];
+}
+
+export function getSwimlaneDepth(swimlanes: SwimlaneConfig[], swimlaneId: string) {
+  const byId = new Map(swimlanes.map((swimlane) => [swimlane.id, swimlane]));
+  const seen = new Set<string>();
+  let depth = 0;
+  let current = byId.get(swimlaneId);
+
+  while (current?.parentId && byId.has(current.parentId) && !seen.has(current.parentId)) {
+    seen.add(current.id);
+    depth += 1;
+    current = byId.get(current.parentId);
+  }
+
+  return depth;
+}
+
+function renumberSwimlanes(swimlanes: SwimlaneConfig[]) {
+  return swimlanes.map((swimlane, index) => ({
+    ...swimlane,
+    order: (index + 1) * 1000,
+  }));
+}
+
 export function getSwimlaneConfigs(board: Board): SwimlaneConfig[] {
   const fromSettings = board.data.settings.swimlanes || [];
   const fromLanes = board.children
@@ -105,10 +199,11 @@ export function getSwimlaneConfigs(board: Board): SwimlaneConfig[] {
       title: lane.data.swimlaneTitle || defaultSwimlaneTitle,
       color: lane.data.swimlaneColor,
       collapsed: lane.data.swimlaneCollapsed,
+      parentId: lane.data.swimlaneParentId,
       order: lane.data.swimlaneOrder ?? (index + 1) * 1000,
     }));
 
-  return sortConfig(dedupeConfig([...fromSettings, ...fromLanes]));
+  return sortSwimlaneConfigs(dedupeConfig([...fromSettings, ...fromLanes]));
 }
 
 export function getColumnConfigs(board: Board): ColumnConfig[] {
@@ -162,6 +257,7 @@ export function createCellLane(
       swimlaneColor: swimlane.color,
       swimlaneCollapsed: swimlane.collapsed,
       swimlaneOrder: swimlane.order,
+      swimlaneParentId: swimlane.parentId,
       columnId: column.id,
       columnTitle: column.title,
       columnColor: column.color,
@@ -224,6 +320,7 @@ export function normalizeSwimlaneBoard(board: Board): Board {
                 swimlaneColor: { $set: swimlane.color },
                 swimlaneCollapsed: { $set: swimlane.collapsed },
                 swimlaneOrder: { $set: swimlane.order },
+                swimlaneParentId: { $set: swimlane.parentId },
                 columnTitle: { $set: column.title },
                 columnColor: { $set: column.color },
                 columnOrder: { $set: column.order },
@@ -296,11 +393,17 @@ export function convertBoardToSwimlanes(board: Board) {
   });
 }
 
-export function addSwimlane(board: Board, title: string) {
+export function addSwimlane(board: Board, title: string, parentId?: string) {
   const columns = getRenderableColumnConfigs(board);
   const swimlanes = getSwimlaneConfigs(board);
+  const normalizedParentId = parentId && swimlanes.some((swimlane) => swimlane.id === parentId)
+    ? parentId
+    : undefined;
   const shouldReplaceImplicitDefault =
-    swimlanes.length === 1 && isImplicitDefaultSwimlane(swimlanes[0]);
+    !normalizedParentId && swimlanes.length === 1 && isImplicitDefaultSwimlane(swimlanes[0]);
+  const siblingSwimlanes = swimlanes.filter(
+    (swimlane) => (swimlane.parentId || '') === (normalizedParentId || '')
+  );
   const swimlaneTitle = uniqueConfigTitle(
     title,
     swimlanes,
@@ -314,9 +417,10 @@ export function addSwimlane(board: Board, title: string) {
       shouldReplaceImplicitDefault ? defaultSwimlaneId : undefined
     ),
     title: swimlaneTitle,
+    parentId: normalizedParentId,
     order: shouldReplaceImplicitDefault
       ? swimlanes[0].order || 1000
-      : (swimlanes[swimlanes.length - 1]?.order || 0) + 1000,
+      : (siblingSwimlanes[siblingSwimlanes.length - 1]?.order || 0) + 1000,
   };
 
   if (shouldReplaceImplicitDefault) {
@@ -330,6 +434,7 @@ export function addSwimlane(board: Board, title: string) {
                     swimlaneId: { $set: swimlane.id },
                     swimlaneTitle: { $set: swimlane.title },
                     swimlaneOrder: { $set: swimlane.order },
+                    swimlaneParentId: { $set: swimlane.parentId },
                   },
                 })
               : lane
@@ -520,66 +625,51 @@ export function setColumnColor(board: Board, columnId: string, color: string) {
 
 export function reorderSwimlane(board: Board, swimlaneId: string, direction: -1 | 1) {
   const swimlanes = getSwimlaneConfigs(board);
-  const index = swimlanes.findIndex((swimlane) => swimlane.id === swimlaneId);
-  const target = index + direction;
-  if (index < 0 || target < 0 || target >= swimlanes.length) return board;
+  const source = swimlanes.find((swimlane) => swimlane.id === swimlaneId);
+  if (!source) return board;
 
-  const reordered = [...swimlanes];
-  reordered.splice(target, 0, reordered.splice(index, 1)[0]);
-
-  return normalizeSwimlaneBoard(
-    update(board, {
-      data: {
-        settings: {
-          $set: {
-            ...board.data.settings,
-            swimlanes: reordered.map((swimlane, i) => ({ ...swimlane, order: (i + 1) * 1000 })),
-          },
-        },
-      },
-    })
+  const siblings = swimlanes.filter(
+    (swimlane) => (swimlane.parentId || '') === (source.parentId || '')
   );
+  const index = siblings.findIndex((swimlane) => swimlane.id === swimlaneId);
+  const target = siblings[index + direction];
+  if (index < 0 || !target) return board;
+
+  return reorderSwimlaneToPlacement(board, swimlaneId, target.id, direction > 0 ? 'after' : 'before');
 }
 
 export function reorderSwimlaneTo(board: Board, sourceId: string, targetId: string) {
-  const swimlanes = getSwimlaneConfigs(board);
-  const sourceIndex = swimlanes.findIndex((swimlane) => swimlane.id === sourceId);
-  const targetIndex = swimlanes.findIndex((swimlane) => swimlane.id === targetId);
-  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return board;
-
-  const reordered = [...swimlanes];
-  reordered.splice(targetIndex, 0, reordered.splice(sourceIndex, 1)[0]);
-
-  return normalizeSwimlaneBoard(
-    update(board, {
-      data: {
-        settings: {
-          $set: {
-            ...board.data.settings,
-            swimlanes: reordered.map((swimlane, i) => ({ ...swimlane, order: (i + 1) * 1000 })),
-          },
-        },
-      },
-    })
-  );
+  return reorderSwimlaneToPlacement(board, sourceId, targetId, 'before');
 }
 
 export function reorderSwimlaneToPlacement(
   board: Board,
   sourceId: string,
   targetId: string,
-  placement: 'before' | 'after'
+  placement: 'before' | 'after',
+  parentId?: string | null
 ) {
   const swimlanes = getSwimlaneConfigs(board);
-  const sourceIndex = swimlanes.findIndex((swimlane) => swimlane.id === sourceId);
-  if (sourceIndex < 0 || sourceId === targetId) return board;
+  const source = swimlanes.find((swimlane) => swimlane.id === sourceId);
+  const target = swimlanes.find((swimlane) => swimlane.id === targetId);
+  if (!source || !target || sourceId === targetId) return board;
 
-  const reordered = [...swimlanes];
-  const [source] = reordered.splice(sourceIndex, 1);
+  const groupIds = getSwimlaneDragGroupIds(swimlanes, sourceId);
+  if (groupIds.includes(targetId)) return board;
+
+  const groupIdSet = new Set(groupIds);
+  const requestedParentId = parentId === undefined ? target.parentId : parentId || undefined;
+  const nextSourceParentId = groupIds.length > 1 ? source.parentId : requestedParentId;
+  const group = swimlanes
+    .filter((swimlane) => groupIdSet.has(swimlane.id))
+    .map((swimlane) =>
+      swimlane.id === sourceId ? { ...swimlane, parentId: nextSourceParentId } : swimlane
+    );
+  const reordered = swimlanes.filter((swimlane) => !groupIdSet.has(swimlane.id));
   const targetIndex = reordered.findIndex((swimlane) => swimlane.id === targetId);
   if (targetIndex < 0) return board;
 
-  reordered.splice(targetIndex + (placement === 'after' ? 1 : 0), 0, source);
+  reordered.splice(targetIndex + (placement === 'after' ? 1 : 0), 0, ...group);
 
   return normalizeSwimlaneBoard(
     update(board, {
@@ -587,7 +677,7 @@ export function reorderSwimlaneToPlacement(
         settings: {
           $set: {
             ...board.data.settings,
-            swimlanes: reordered.map((swimlane, i) => ({ ...swimlane, order: (i + 1) * 1000 })),
+            swimlanes: renumberSwimlanes(reordered),
           },
         },
       },
@@ -672,8 +762,9 @@ export function reorderColumnToPlacement(
   );
 }
 
-function ensureMoveSwimlane(board: Board, sourceId: string, destinationId?: string) {
-  const swimlanes = getSwimlaneConfigs(board).filter((swimlane) => swimlane.id !== sourceId);
+function ensureMoveSwimlane(board: Board, sourceIds: string[], destinationId?: string) {
+  const sourceIdSet = new Set(sourceIds);
+  const swimlanes = getSwimlaneConfigs(board).filter((swimlane) => !sourceIdSet.has(swimlane.id));
   if (destinationId && swimlanes.some((swimlane) => swimlane.id === destinationId)) {
     return { board, destinationId };
   }
@@ -732,9 +823,11 @@ function ensureMoveColumn(board: Board, sourceId: string, destinationId?: string
 
 export function deleteSwimlane(board: Board, swimlaneId: string, moveToSwimlaneId?: string) {
   let workingBoard = board;
+  const sourceIds = getSwimlaneDragGroupIds(getSwimlaneConfigs(workingBoard), swimlaneId);
+  const sourceIdSet = new Set(sourceIds);
 
   if (moveToSwimlaneId !== undefined) {
-    const ensured = ensureMoveSwimlane(workingBoard, swimlaneId, moveToSwimlaneId);
+    const ensured = ensureMoveSwimlane(workingBoard, sourceIds, moveToSwimlaneId);
     workingBoard = ensured.board;
     moveToSwimlaneId = ensured.destinationId;
     workingBoard = update(workingBoard, {
@@ -746,7 +839,9 @@ export function deleteSwimlane(board: Board, swimlaneId: string, moveToSwimlaneI
     });
 
     workingBoard.children.forEach((lane) => {
-      if (lane.data.swimlaneId !== swimlaneId || !lane.children.length) return;
+      if (!lane.data.swimlaneId || !sourceIdSet.has(lane.data.swimlaneId) || !lane.children.length) {
+        return;
+      }
       const target = getCellLane(workingBoard, moveToSwimlaneId, lane.data.columnId);
       if (target) {
         target.children.push(...lane.children);
@@ -755,13 +850,15 @@ export function deleteSwimlane(board: Board, swimlaneId: string, moveToSwimlaneI
   }
 
   const swimlanes = getSwimlaneConfigs(workingBoard).filter(
-    (swimlane) => swimlane.id !== swimlaneId
+    (swimlane) => !sourceIdSet.has(swimlane.id)
   );
 
   return normalizeSwimlaneBoard(
     update(workingBoard, {
       children: {
-        $set: workingBoard.children.filter((lane) => lane.data.swimlaneId !== swimlaneId),
+        $set: workingBoard.children.filter(
+          (lane) => !lane.data.swimlaneId || !sourceIdSet.has(lane.data.swimlaneId)
+        ),
       },
       data: { settings: { $set: { ...workingBoard.data.settings, swimlanes } } },
     })

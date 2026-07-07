@@ -20,6 +20,8 @@ import {
   getCellLane,
   getRenderableColumnConfigs,
   getRenderableSwimlaneConfigs,
+  getSwimlaneDepth,
+  getSwimlaneDragGroupIds,
   isImplicitDefaultColumn,
   isImplicitDefaultSwimlane,
   unassignedColumnId,
@@ -37,11 +39,14 @@ type HeaderDragPlacement = 'before' | 'after';
 type HeaderDragState = {
   type: HeaderDragType;
   sourceId: string;
+  sourceIds: string[];
   targetId?: string;
   placement?: HeaderDragPlacement;
+  parentId?: string | null;
   offsetX: number;
   offsetY: number;
   orderIds: string[];
+  previewSwimlanes?: SwimlaneConfig[];
 };
 
 function areOrdersEqual(a: string[], b: string[]) {
@@ -50,8 +55,48 @@ function areOrdersEqual(a: string[], b: string[]) {
 
 function getDragOrderKey(dragState: HeaderDragState | null) {
   return dragState
-    ? `${dragState.type}:${dragState.sourceId}:${dragState.orderIds.join('|')}`
+    ? `${dragState.type}:${dragState.sourceId}:${dragState.orderIds.join('|')}:${
+        dragState.parentId || ''
+      }`
     : null;
+}
+
+function getElementByDataValue(root: HTMLElement, attribute: string, value: string) {
+  return Array.from(root.querySelectorAll<HTMLElement>(`[${attribute}]`)).find(
+    (element) => element.getAttribute(attribute) === value
+  );
+}
+
+function getPreviewSwimlaneParentId(
+  swimlanes: SwimlaneConfig[],
+  sourceId: string,
+  sourceIds: string[],
+  targetId: string,
+  clientX: number,
+  root: HTMLElement | null
+): string | null {
+  const source = swimlanes.find((swimlane) => swimlane.id === sourceId);
+  const target = swimlanes.find((swimlane) => swimlane.id === targetId);
+  if (!source || !target || sourceIds.length > 1) return source?.parentId || null;
+
+  const header = root
+    ? getElementByDataValue(root, 'data-kanban-swimlane-id', targetId)
+    : null;
+  const rect = header?.getBoundingClientRect() || root?.getBoundingClientRect();
+  const nestThreshold = rect ? rect.left + 34 : clientX + 1;
+
+  if (clientX <= nestThreshold) return null;
+  return target.parentId || target.id;
+}
+
+function getPreviewSwimlanes(
+  swimlanes: SwimlaneConfig[],
+  sourceId: string,
+  parentId: string | null
+) {
+  return swimlanes.map((swimlane) =>
+    swimlane.id === sourceId ? { ...swimlane, parentId: parentId || undefined } : swimlane
+  );
 }
 
 function getAnimatedRects(root: HTMLElement) {
@@ -91,22 +136,23 @@ function getAnimatedRects(root: HTMLElement) {
   return { animatedKeys, elements, rects, visualRects };
 }
 
-function isDragSourceKey(key: string, type: HeaderDragType, sourceId: string) {
+function isDragSourceKey(key: string, type: HeaderDragType, sourceIds: string[]) {
   const parts = key.split(':');
+  const sourceIdSet = new Set(sourceIds);
 
   if (type === 'column') {
     return (
-      key === `column-frame:${sourceId}` ||
-      key === `column-header:${sourceId}` ||
-      (parts[0] === 'cell' && parts[2] === sourceId)
+      sourceIds.some((sourceId) => key === `column-frame:${sourceId}`) ||
+      sourceIds.some((sourceId) => key === `column-header:${sourceId}`) ||
+      (parts[0] === 'cell' && sourceIdSet.has(parts[2]))
     );
   }
 
   return (
-    key === `swimlane-frame:${sourceId}` ||
-    key === `swimlane-header:${sourceId}` ||
-    key === `swimlane-collapsed:${sourceId}` ||
-    (parts[0] === 'cell' && parts[1] === sourceId)
+    sourceIds.some((sourceId) => key === `swimlane-frame:${sourceId}`) ||
+    sourceIds.some((sourceId) => key === `swimlane-header:${sourceId}`) ||
+    sourceIds.some((sourceId) => key === `swimlane-collapsed:${sourceId}`) ||
+    (parts[0] === 'cell' && sourceIdSet.has(parts[1]))
   );
 }
 
@@ -240,11 +286,15 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
     startY: number;
     isDragging: boolean;
     ids: string[];
+    sourceIds: string[];
     targetId?: string;
     placement?: HeaderDragPlacement;
+    parentId?: string | null;
     offsetX: number;
     offsetY: number;
     sourceRect?: DOMRect;
+    previewSwimlanes?: SwimlaneConfig[];
+    swimlanes?: SwimlaneConfig[];
   } | null>(null);
   const renderColumns = useMemo(() => {
     if (dragState?.type !== 'column') return columns;
@@ -259,13 +309,58 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
   const renderSwimlanes = useMemo(() => {
     if (dragState?.type !== 'swimlane') return swimlanes;
 
-    const byId = new Map(swimlanes.map((swimlane) => [swimlane.id, swimlane]));
+    const sourceSwimlanes = dragState.previewSwimlanes || swimlanes;
+    const byId = new Map(sourceSwimlanes.map((swimlane) => [swimlane.id, swimlane]));
     const ordered = dragState.orderIds
       .map((id) => byId.get(id))
       .filter((swimlane): swimlane is SwimlaneConfig => !!swimlane);
 
     return ordered.length === swimlanes.length ? ordered : swimlanes;
   }, [dragState, swimlanes]);
+  const swimlaneDepths = useMemo(() => {
+    return new Map(
+      renderSwimlanes.map((swimlane) => [
+        swimlane.id,
+        getSwimlaneDepth(renderSwimlanes, swimlane.id),
+      ])
+    );
+  }, [renderSwimlanes]);
+  const swimlaneChildCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    renderSwimlanes.forEach((swimlane) => {
+      if (!swimlane.parentId) return;
+      counts.set(swimlane.parentId, (counts.get(swimlane.parentId) || 0) + 1);
+    });
+    return counts;
+  }, [renderSwimlanes]);
+  const swimlaneParentFrames = useMemo(() => {
+    const indexById = new Map(renderSwimlanes.map((swimlane, index) => [swimlane.id, index]));
+
+    return renderSwimlanes
+      .filter((swimlane) => swimlaneChildCounts.has(swimlane.id))
+      .reduce<
+        {
+          swimlane: SwimlaneConfig;
+          startIndex: number;
+          endIndex: number;
+          depth: number;
+        }[]
+      >((frames, swimlane) => {
+        const groupIndexes = getSwimlaneDragGroupIds(renderSwimlanes, swimlane.id)
+          .map((id) => indexById.get(id))
+          .filter((index): index is number => typeof index === 'number');
+        if (groupIndexes.length <= 1) return frames;
+
+        frames.push({
+          swimlane,
+          startIndex: Math.min(...groupIndexes),
+          endIndex: Math.max(...groupIndexes),
+          depth: swimlaneDepths.get(swimlane.id) || 0,
+        });
+
+        return frames;
+      }, []);
+  }, [renderSwimlanes, swimlaneChildCounts, swimlaneDepths]);
   const ignoreNextHeaderClickRef = useRef(false);
   const win = view.getWindow();
   const app = view.app;
@@ -283,7 +378,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
         Array.from(grid.querySelectorAll<HTMLElement>('[data-swimlane-anim-key]')).forEach(
           (element) => {
             const key = element.dataset.swimlaneAnimKey;
-            if (!key || !isDragSourceKey(key, dragState.type, dragState.sourceId)) return;
+            if (!key || !isDragSourceKey(key, dragState.type, dragState.sourceIds)) return;
 
             const startRect = sourceStartRects.get(key);
             const nextRect = layoutRects.get(key);
@@ -308,7 +403,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
       const key = element.dataset.swimlaneAnimKey;
       if (!key) return;
 
-      if (dragState && sourceStartRects && isDragSourceKey(key, dragState.type, dragState.sourceId)) {
+      if (dragState && sourceStartRects && isDragSourceKey(key, dragState.type, dragState.sourceIds)) {
         const startRect = sourceStartRects.get(key);
         const nextRect = rects.get(key);
         if (startRect && nextRect) {
@@ -327,7 +422,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
     if (dragState && previousRects) {
       elements.forEach((element) => {
         const key = element.dataset.swimlaneAnimKey;
-        if (!key || isDragSourceKey(key, dragState.type, dragState.sourceId)) return;
+        if (!key || isDragSourceKey(key, dragState.type, dragState.sourceIds)) return;
 
         const previousRect = animatedKeys.has(key) ? visualRects.get(key) : previousRects.get(key);
         const nextRect = rects.get(key);
@@ -437,8 +532,9 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
 
   const showSwimlaneMenu = useCallback(
     (event: MouseEvent, swimlane: SwimlaneConfig) => {
+      const swimlaneGroupIds = new Set(getSwimlaneDragGroupIds(swimlanes, swimlane.id));
       const hasCards = boardData.children.some(
-        (lane) => lane.data.swimlaneId === swimlane.id && lane.children.length > 0
+        (lane) => lane.data.swimlaneId && swimlaneGroupIds.has(lane.data.swimlaneId) && lane.children.length > 0
       );
       const menu = new Menu()
         .addItem((item) =>
@@ -448,6 +544,16 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
             .onClick(() => {
               openTextInput(app, 'Swimlane name', swimlane.title, (title) =>
                 boardModifiers.renameSwimlane(swimlane.id, title)
+              );
+            })
+        )
+        .addItem((item) =>
+          item
+            .setIcon('lucide-list-tree')
+            .setTitle('Add sub-swimlane')
+            .onClick(() => {
+              openTextInput(app, 'Sub-swimlane name', '', (title) =>
+                boardModifiers.addSwimlane(title, swimlane.id)
               );
             })
         )
@@ -488,7 +594,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
             .setTitle('Delete and move cards to')
             .setSubmenu();
           swimlanes
-            .filter((candidate) => candidate.id !== swimlane.id)
+            .filter((candidate) => !swimlaneGroupIds.has(candidate.id))
             .forEach((candidate) => {
               submenu.addItem((item: any) =>
                 item
@@ -517,7 +623,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
         )
         .showAtMouseEvent(event);
     },
-    [app, boardData, boardModifiers, swimlanes]
+    [app, boardData, boardModifiers, swimlaneDepths, swimlanes]
   );
 
   const addSwimlane = useCallback(() => {
@@ -586,7 +692,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
 
   const getHeaderDragClasses = useCallback(
     (type: HeaderDragType, id: string) => ({
-      'is-drag-source': dragState?.type === type && dragState.sourceId === id,
+      'is-drag-source': dragState?.type === type && dragState.sourceIds.includes(id),
       'is-drop-target': dragState?.type === type && dragState.targetId === id,
       'is-drop-before':
         dragState?.type === type && dragState.targetId === id && dragState.placement === 'before',
@@ -611,7 +717,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
         dragState.targetId === columnId &&
         dragState.placement === 'after',
       'is-swimlane-drag-source':
-        dragState?.type === 'swimlane' && dragState.sourceId === swimlaneId,
+        dragState?.type === 'swimlane' && dragState.sourceIds.includes(swimlaneId),
       'is-swimlane-drop-target':
         dragState?.type === 'swimlane' && dragState.targetId === swimlaneId,
       'is-swimlane-drop-before':
@@ -628,7 +734,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
 
   const getHeaderDragStyle = useCallback(
     (type: HeaderDragType, id: string) => {
-      if (dragState?.type !== type || dragState.sourceId !== id) return {};
+      if (dragState?.type !== type || !dragState.sourceIds.includes(id)) return {};
 
       return {
         '--swimlane-drag-x': `${type === 'column' ? dragState.offsetX : 0}px`,
@@ -647,7 +753,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
           '--swimlane-drag-y': '0px',
         };
       }
-      if (dragState.type === 'swimlane' && dragState.sourceId === swimlaneId) {
+      if (dragState.type === 'swimlane' && dragState.sourceIds.includes(swimlaneId)) {
         return {
           '--swimlane-drag-x': '0px',
           '--swimlane-drag-y': `${dragState.offsetY}px`,
@@ -678,6 +784,9 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
       event.preventDefault();
       event.stopPropagation();
       let sourceRect: DOMRect | undefined;
+      const sourceIds =
+        type === 'swimlane' ? getSwimlaneDragGroupIds(swimlanes, sourceId) : [sourceId];
+      const sourceIdSet = new Set(sourceIds);
       if (gridRef.current) {
         const { rects } = getAnimatedRects(gridRef.current);
         dragStartRectsRef.current = rects;
@@ -693,9 +802,15 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
         startY: event.clientY,
         isDragging: false,
         ids: (type === 'column' ? columns : swimlanes).map((config) => config.id),
+        sourceIds,
         offsetX: 0,
         offsetY: 0,
         sourceRect,
+        parentId:
+          type === 'swimlane'
+            ? swimlanes.find((swimlane) => swimlane.id === sourceId)?.parentId || null
+            : undefined,
+        swimlanes: type === 'swimlane' ? swimlanes : undefined,
       };
 
       const frameSelector =
@@ -738,7 +853,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
 
           return (
             id &&
-            id !== drag.sourceId &&
+            !drag.sourceIds.includes(id) &&
             drag.ids.includes(id) &&
             (drag.type === 'column'
               ? draggedCenter >= rect.left && draggedCenter <= rect.right
@@ -746,17 +861,34 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
           );
         });
         const targetId = target?.getAttribute(frameAttribute);
-        if (!targetId || targetId === drag.sourceId) {
+        if (!targetId || sourceIdSet.has(targetId)) {
           setDragState({
             type: drag.type,
             sourceId: drag.sourceId,
+            sourceIds: drag.sourceIds,
             targetId: drag.targetId,
             placement: drag.placement,
+            parentId: drag.parentId,
             offsetX: drag.offsetX,
             offsetY: drag.offsetY,
             orderIds: drag.ids,
+            previewSwimlanes: drag.previewSwimlanes,
           });
           return;
+        }
+
+        let previewSwimlanes: SwimlaneConfig[] | undefined;
+        if (drag.type === 'swimlane' && drag.swimlanes) {
+          drag.parentId = getPreviewSwimlaneParentId(
+            drag.swimlanes,
+            drag.sourceId,
+            drag.sourceIds,
+            targetId,
+            moveEvent.clientX,
+            gridRef.current
+          );
+          previewSwimlanes = getPreviewSwimlanes(drag.swimlanes, drag.sourceId, drag.parentId);
+          drag.previewSwimlanes = previewSwimlanes;
         }
 
         const rect =
@@ -771,20 +903,24 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
           setDragState({
             type: drag.type,
             sourceId: drag.sourceId,
+            sourceIds: drag.sourceIds,
             targetId: drag.targetId,
             placement: drag.placement,
+            parentId: drag.parentId,
             offsetX: drag.offsetX,
             offsetY: drag.offsetY,
             orderIds: drag.ids,
+            previewSwimlanes: drag.previewSwimlanes,
           });
           return;
         }
 
         const placement: HeaderDragPlacement = distanceFromCenter > 0 ? 'after' : 'before';
-        const nextIds = drag.ids.filter((id) => id !== drag.sourceId);
+        const nextIds = drag.ids.filter((id) => !drag.sourceIds.includes(id));
+        const sourceGroupIds = drag.ids.filter((id) => drag.sourceIds.includes(id));
         const targetIndex = nextIds.indexOf(targetId);
         if (targetIndex >= 0) {
-          nextIds.splice(targetIndex + (placement === 'after' ? 1 : 0), 0, drag.sourceId);
+          nextIds.splice(targetIndex + (placement === 'after' ? 1 : 0), 0, ...sourceGroupIds);
           if (!areOrdersEqual(nextIds, drag.ids)) {
             drag.ids = nextIds;
           }
@@ -795,11 +931,14 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
         setDragState({
           type: drag.type,
           sourceId: drag.sourceId,
+          sourceIds: drag.sourceIds,
           targetId,
           placement,
+          parentId: drag.parentId,
           offsetX: drag.offsetX,
           offsetY: drag.offsetY,
           orderIds: drag.ids,
+          previewSwimlanes,
         });
       };
 
@@ -817,7 +956,8 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
             boardModifiers.reorderSwimlaneToPlacement(
               drag.sourceId,
               drag.targetId,
-              drag.placement
+              drag.placement,
+              drag.parentId ?? null
             );
           }
         }
@@ -898,6 +1038,21 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
         className={c('swimlane-grid')}
         style={{ '--swimlane-column-count': renderColumns.length } as any}
       >
+        {swimlaneParentFrames.map(({ swimlane, startIndex, endIndex, depth }) => (
+          <div
+            key={`${swimlane.id}-swimlane-parent-frame`}
+            className={c('swimlane-parent-frame')}
+            style={
+              {
+                gridColumn: `1 / span ${renderColumns.length + 1}`,
+                gridRow: `${startIndex + 2} / ${endIndex + 3}`,
+                '--swimlane-color': swimlane.color,
+                '--swimlane-depth': depth,
+              } as any
+            }
+            aria-hidden="true"
+          />
+        ))}
         {renderColumns.map((column, columnIndex) => (
           <div
             key={`${column.id}-column-frame`}
@@ -930,6 +1085,8 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
               c('swimlane-row-frame'),
               {
                 'is-implicit-hidden': hideSwimlaneHeaders && isImplicitDefaultSwimlane(swimlane),
+                'is-sub-swimlane': (swimlaneDepths.get(swimlane.id) || 0) > 0,
+                'has-sub-swimlanes': swimlaneChildCounts.has(swimlane.id),
                 ...getHeaderDragClasses('swimlane', swimlane.id),
               },
             ])}
@@ -938,6 +1095,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
                 gridColumn: `1 / span ${renderColumns.length + 1}`,
                 gridRow: `${swimlaneIndex + 2}`,
                 '--swimlane-color': swimlane.color,
+                '--swimlane-depth': swimlaneDepths.get(swimlane.id) || 0,
                 ...getHeaderDragStyle('swimlane', swimlane.id),
               } as any
             }
@@ -1015,16 +1173,20 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
                   c('swimlane-row-header'),
                   {
                     'is-collapsed': swimlane.collapsed,
+                    'is-sub-swimlane': (swimlaneDepths.get(swimlane.id) || 0) > 0,
+                    'has-sub-swimlanes': swimlaneChildCounts.has(swimlane.id),
                     ...getHeaderDragClasses('swimlane', swimlane.id),
                   },
                 ])}
                 data-kanban-swimlane-id={swimlane.id}
+                data-kanban-swimlane-parent-id={swimlane.parentId}
                 data-swimlane-anim-key={`swimlane-header:${swimlane.id}`}
                 style={
                   {
                     gridColumn: '1',
                     gridRow: `${swimlaneIndex + 2}`,
                     '--swimlane-color': swimlane.color,
+                    '--swimlane-depth': swimlaneDepths.get(swimlane.id) || 0,
                     ...getHeaderDragStyle('swimlane', swimlane.id),
                   } as any
                 }
@@ -1058,6 +1220,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
                   {
                     gridColumn: `2 / span ${renderColumns.length}`,
                     gridRow: `${swimlaneIndex + 2}`,
+                    '--swimlane-depth': swimlaneDepths.get(swimlane.id) || 0,
                     ...getHeaderDragStyle('swimlane', swimlane.id),
                   } as any
                 }
@@ -1092,6 +1255,8 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
                       c('swimlane-cell'),
                       {
                         'has-column-color': column.color,
+                        'is-sub-swimlane': (swimlaneDepths.get(swimlane.id) || 0) > 0,
+                        'has-sub-swimlanes': swimlaneChildCounts.has(swimlane.id),
                         ...getCellDragClasses(column.id, swimlane.id),
                       },
                     ])}

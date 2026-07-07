@@ -306,6 +306,7 @@ function mergeSwimlaneConfig(
     title,
     color: match?.color,
     collapsed: match?.collapsed,
+    parentId: match?.parentId,
     order: match?.order ?? fallbackOrder,
   };
 }
@@ -385,6 +386,7 @@ function astToSwimlaneBoard(
         swimlaneColor: currentSwimlane.color,
         swimlaneCollapsed: currentSwimlane.collapsed,
         swimlaneOrder: currentSwimlane.order,
+        swimlaneParentId: currentSwimlane.parentId,
         columnId: column.id,
         columnTitle: column.title,
         columnColor: column.color,

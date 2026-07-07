@@ -25,6 +25,7 @@ export interface LaneData {
   swimlaneColor?: string;
   swimlaneCollapsed?: boolean;
   swimlaneOrder?: number;
+  swimlaneParentId?: string;
   columnId?: string;
   columnTitle?: string;
   columnColor?: string;
@@ -37,6 +38,7 @@ export interface SwimlaneConfig {
   title: string;
   color?: string;
   collapsed?: boolean;
+  parentId?: string;
   order: number;
 }
 
