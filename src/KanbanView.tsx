@@ -169,8 +169,10 @@ export class KanbanView extends TextFileView implements HoverParent {
   onload() {
     super.onload();
     if (Platform.isMobile) {
+      const mobileNavbarHeight =
+        (this.app as any).mobileNavbar?.containerEl?.clientHeight || 0;
       this.containerEl.setCssProps({
-        '--mobile-navbar-height': (this.app as any).mobileNavbar.containerEl.clientHeight + 'px',
+        '--mobile-navbar-height': `${mobileNavbarHeight}px`,
       });
     }
 

@@ -111,12 +111,13 @@ function getAnimatedRects(root: HTMLElement) {
     const key = element.dataset.swimlaneAnimKey;
     if (key) {
       visualRects.set(key, element.getBoundingClientRect());
-      if (element.getAnimations().length) {
+      const animations =
+        typeof element.getAnimations === 'function' ? element.getAnimations() : [];
+      if (animations.length) {
         animatedKeys.add(key);
       }
+      animations.forEach((animation) => animation.cancel());
     }
-
-    element.getAnimations().forEach((animation) => animation.cancel());
     previousTransforms.set(element, element.style.transform);
     element.style.transform = '';
   });
@@ -432,16 +433,18 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
         const y = previousRect.top - nextRect.top;
         if (Math.abs(x) < 0.5 && Math.abs(y) < 0.5) return;
 
-        element.animate(
-          [
-            { transform: `translate3d(${x}px, ${y}px, 0)` },
-            { transform: 'translate3d(0, 0, 0)' },
-          ],
-          {
-            duration: 170,
-            easing: 'cubic-bezier(0.2, 0, 0, 1)',
-          }
-        );
+        if (typeof element.animate === 'function') {
+          element.animate(
+            [
+              { transform: `translate3d(${x}px, ${y}px, 0)` },
+              { transform: 'translate3d(0, 0, 0)' },
+            ],
+            {
+              duration: 170,
+              easing: 'cubic-bezier(0.2, 0, 0, 1)',
+            }
+          );
+        }
       });
     }
 
@@ -781,8 +784,11 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
     (event: PointerEvent, type: HeaderDragType, sourceId: string) => {
       if (event.button !== 0) return;
 
-      event.preventDefault();
-      event.stopPropagation();
+      const isTouchPointer = event.pointerType === 'touch' || event.pointerType === 'pen';
+      if (!isTouchPointer) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       let sourceRect: DOMRect | undefined;
       const sourceIds =
         type === 'swimlane' ? getSwimlaneDragGroupIds(swimlanes, sourceId) : [sourceId];
@@ -817,12 +823,44 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
         type === 'column' ? '[data-kanban-column-frame-id]' : '[data-kanban-swimlane-frame-id]';
       const frameAttribute =
         type === 'column' ? 'data-kanban-column-frame-id' : 'data-kanban-swimlane-frame-id';
+      let touchDragReady = !isTouchPointer;
+      let longPressTimeout = 0;
+
+      const preventTouchScroll = (touchEvent: TouchEvent) => {
+        touchEvent.preventDefault();
+      };
+      const preventTouchContextMenu = (contextMenuEvent: MouseEvent) => {
+        contextMenuEvent.preventDefault();
+        contextMenuEvent.stopPropagation();
+      };
+
+      if (isTouchPointer) {
+        win.addEventListener('contextmenu', preventTouchContextMenu, true);
+        longPressTimeout = win.setTimeout(() => {
+          const drag = headerDragRef.current;
+          if (!drag || drag.pointerId !== event.pointerId) return;
+          touchDragReady = true;
+          drag.isDragging = true;
+          win.addEventListener('touchmove', preventTouchScroll, { passive: false });
+        }, 500);
+      }
 
       const onPointerMove = (moveEvent: PointerEvent) => {
         const drag = headerDragRef.current;
         if (!drag || drag.pointerId !== moveEvent.pointerId) return;
 
         const distance = Math.hypot(moveEvent.clientX - drag.startX, moveEvent.clientY - drag.startY);
+        if (isTouchPointer && !touchDragReady) {
+          if (distance > 8) {
+            win.clearTimeout(longPressTimeout);
+            headerDragRef.current = null;
+            win.removeEventListener('pointermove', onPointerMove);
+            win.removeEventListener('pointerup', onPointerUp);
+            win.removeEventListener('pointercancel', onPointerUp);
+            win.removeEventListener('contextmenu', preventTouchContextMenu, true);
+          }
+          return;
+        }
         if (!drag.isDragging && distance < 5) return;
 
         moveEvent.preventDefault();
@@ -945,9 +983,12 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
       const onPointerUp = (upEvent: PointerEvent) => {
         const drag = headerDragRef.current;
         if (drag?.pointerId !== upEvent.pointerId) return;
+        win.clearTimeout(longPressTimeout);
         win.removeEventListener('pointermove', onPointerMove);
         win.removeEventListener('pointerup', onPointerUp);
         win.removeEventListener('pointercancel', onPointerUp);
+        win.removeEventListener('touchmove', preventTouchScroll);
+        win.removeEventListener('contextmenu', preventTouchContextMenu, true);
 
         if (drag.isDragging && drag.targetId && drag.placement) {
           if (drag.type === 'column') {

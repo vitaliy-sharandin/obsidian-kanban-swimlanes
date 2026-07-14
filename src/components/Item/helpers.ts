@@ -331,7 +331,7 @@ interface FileData {
 export function getFileListFromClipboard(win: Window & typeof globalThis) {
   const clipboard = win.require('electron').remote.clipboard;
 
-  if (process.platform === 'darwin') {
+  if (Platform.isMacOS) {
     // https://github.com/electron/electron/issues/9035#issuecomment-359554116
     if (clipboard.has('NSFilenamesPboardType')) {
       return (

@@ -20,7 +20,13 @@ jobs:
       - name: Build plugin
         run: |
           npm install
+          npm run typecheck
+          npm run lint
           npm run build
+
+      - name: Validate release metadata
+        run: |
+          node -e "const m=require('./manifest.json'); const p=require('./package.json'); const tag=process.env.GITHUB_REF_NAME; if (m.version !== p.version || m.version !== tag) { console.error('Release tag, manifest version, and package version must match:', { tag, manifest: m.version, package: p.version }); process.exit(1); }"
 
       - name: Create release
         env:

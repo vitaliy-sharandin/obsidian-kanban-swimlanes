@@ -38,11 +38,11 @@ export function openColorPickerPopover({
 
   const close = () => {
     popover.remove();
-    win.document.removeEventListener('mousedown', onDocumentMouseDown, true);
+    win.document.removeEventListener('pointerdown', onDocumentPointerDown, true);
     win.document.removeEventListener('keydown', onKeyDown, true);
   };
 
-  const onDocumentMouseDown = (event: MouseEvent) => {
+  const onDocumentPointerDown = (event: PointerEvent) => {
     if (!popover.contains(event.target as Node)) {
       close();
     }
@@ -82,7 +82,7 @@ export function openColorPickerPopover({
     if (rect.bottom > win.innerHeight) {
       popover.style.top = `${Math.max(8, y - rect.height)}px`;
     }
-    win.document.addEventListener('mousedown', onDocumentMouseDown, true);
+    win.document.addEventListener('pointerdown', onDocumentPointerDown, true);
     win.document.addEventListener('keydown', onKeyDown, true);
   });
 }
@@ -100,12 +100,14 @@ export function addColorMenuItem(
       .setIcon('lucide-palette')
       .setTitle(title)
       .onClick((event) => {
-        const isMouseEvent = 'clientX' in event;
-        const win = event.view;
+        const win = event.view || activeWindow;
+        const pointerEvent = 'clientX' in event ? event : null;
+        const hasPointerPosition =
+          pointerEvent && (pointerEvent.clientX !== 0 || pointerEvent.clientY !== 0);
         openColorPickerPopover({
           win,
-          x: isMouseEvent ? event.clientX : win.innerWidth / 2,
-          y: isMouseEvent ? event.clientY : win.innerHeight / 2,
+          x: hasPointerPosition ? pointerEvent.clientX : win.innerWidth / 2,
+          y: hasPointerPosition ? pointerEvent.clientY : win.innerHeight / 2,
           color,
           defaultColor,
           onChange,

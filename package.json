@@ -1,6 +1,6 @@
 {
   "name": "obsidian-kanban-swimlanes",
-  "version": "2.0.51",
+  "version": "1.0.3",
   "description": "Markdown-backed Kanban boards with horizontal swimlanes for Obsidian.",
   "main": "main.js",
   "scripts": {

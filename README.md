@@ -60,3 +60,14 @@ The release artifact for Obsidian is:
 - `manifest.json`
 - `main.js`
 - `styles.css`
+
+## Mobile
+
+The plugin supports Obsidian Mobile. On Android, tap a swimlane or column header to open its
+menu, or long-press and drag the header to reorder it. Card drag-and-drop uses the inherited
+long-press gesture from the original Kanban plugin. Long-pressing a recognized board file in
+the file explorer also provides **Open as Kanban swim board**.
+
+For a manual mobile installation, place the three release artifacts in
+`.obsidian/plugins/obsidian-kanban-swimlanes/`, then restart Obsidian and enable **Kanban
+Swimlanes** under **Settings → Community plugins**.

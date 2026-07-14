@@ -1,4 +1,13 @@
-# Kanban Swimlanes 2.0.51
+# Kanban Swimlanes 1.0.3
+
+- Added Android/mobile-safe Web Animation fallbacks.
+- Added long-press header reordering without blocking normal touch scrolling or taps.
+- Made essential swimlane, column, and cell actions visible and touch-sized on mobile.
+- Added the **Open as Kanban swim board** action to mobile file context menus.
+- Made the color picker and mobile navbar integration resilient to mobile runtime differences.
+- Aligned release metadata across the manifest, package, and version compatibility map.
+
+## Earlier fork work
 
 - Forked the Obsidian Kanban plugin under plugin id `obsidian-kanban-swimlanes`.
 - Added markdown-backed `swimlanes-v1` boards using `# Swimlane` and `## Column` headings.

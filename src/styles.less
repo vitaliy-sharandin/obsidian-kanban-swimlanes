@@ -2777,3 +2777,84 @@ body:not(.native-scrollbars) .kanban-swimlanes-plugin__scroll-container::-webkit
     background-color: var(--date-background-color, rgba(var(--mono-rgb-100), 0.05));
   }
 }
+
+// Touch devices do not have a persistent hover state. Keep all essential board
+// actions visible and large enough to use without a mouse.
+.is-mobile {
+  .kanban-swimlanes-plugin__board.kanban-swimlanes-plugin__swimlane-scroll {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .kanban-swimlanes-plugin__swimlane-board {
+    padding: var(--size-4-2);
+  }
+
+  .kanban-swimlanes-plugin__swimlane-toolbar {
+    flex-wrap: nowrap;
+  }
+
+  .kanban-swimlanes-plugin__swimlane-filter {
+    flex-basis: auto;
+    min-width: 0;
+
+    input {
+      font-size: 16px;
+    }
+  }
+
+  .kanban-swimlanes-plugin__swimlane-grid {
+    --swimlane-row-header-width: 132px;
+  }
+
+  .kanban-swimlanes-plugin__swimlane-column-header,
+  .kanban-swimlanes-plugin__swimlane-row-header {
+    min-height: 44px;
+  }
+
+  .kanban-swimlanes-plugin__swimlane-header-grip {
+    opacity: 0.65;
+  }
+
+  .kanban-swimlanes-plugin__swimlane-add-column-button,
+  .kanban-swimlanes-plugin__swimlane-add-swimlane-button,
+  .kanban-swimlanes-plugin__swimlane-cell-actions {
+    opacity: 1;
+    transform: none;
+  }
+
+  .kanban-swimlanes-plugin__swimlane-add-column-button {
+    min-width: 36px;
+  }
+
+  .kanban-swimlanes-plugin__swimlane-add-swimlane-button {
+    min-height: 36px;
+  }
+
+  .kanban-swimlanes-plugin__swimlane-cell-action {
+    min-height: 32px;
+    font-size: 12px;
+  }
+
+  .kanban-swimlanes-plugin__item-postfix-button {
+    min-width: 32px;
+    min-height: 32px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .kanban-swimlanes-plugin__note-preview-resize {
+    width: 28px;
+    height: 28px;
+  }
+
+  .kanban-swimlanes-plugin__color-popover {
+    max-width: calc(100vw - 16px);
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .kanban-swimlanes-plugin__color-popover-input {
+    width: 120px;
+    max-width: calc(100vw - 84px);
+  }
+}

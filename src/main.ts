@@ -382,6 +382,17 @@ export default class KanbanPlugin extends Plugin {
         const fileIsFolder = file instanceof TFolder;
         const leafIsMarkdown = leaf?.view instanceof MarkdownView;
         const leafIsKanban = leaf?.view instanceof KanbanView;
+        const openAsKanban = () => {
+          if (!fileIsFile) return;
+
+          const targetLeaf = leafIsMarkdown && leaf ? leaf : this.app.workspace.getLeaf(false);
+          this.kanbanFileModes[(targetLeaf as any).id || file.path] = kanbanViewType;
+          targetLeaf.setViewState({
+            type: kanbanViewType,
+            state: { file: file.path },
+            popstate: true,
+          } as ViewState);
+        };
 
         // Add a menu item to the folder context menu to create a board
         if (fileIsFolder) {
@@ -396,13 +407,13 @@ export default class KanbanPlugin extends Plugin {
         }
 
         if (
-          !Platform.isMobile &&
           fileIsFile &&
-          leaf &&
           source === 'sidebar-context-menu' &&
           hasFrontmatterKey(file)
         ) {
-          const views = this.getKanbanViews(getParentWindow(leaf.view.containerEl));
+          const views = leaf
+            ? this.getKanbanViews(getParentWindow(leaf.view.containerEl))
+            : [];
           let haveKanbanView = false;
 
           for (const view of views) {
@@ -419,10 +430,7 @@ export default class KanbanPlugin extends Plugin {
                 .setTitle(t('Open as Kanban swim board'))
                 .setIcon(kanbanIcon)
                 .setSection('pane')
-                .onClick(() => {
-                  this.kanbanFileModes[(leaf as any).id || file.path] = kanbanViewType;
-                  this.setKanbanView(leaf);
-                });
+                .onClick(openAsKanban);
             });
 
             return;
@@ -440,10 +448,7 @@ export default class KanbanPlugin extends Plugin {
               .setTitle(t('Open as Kanban swim board'))
               .setIcon(kanbanIcon)
               .setSection('pane')
-              .onClick(() => {
-                this.kanbanFileModes[(leaf as any).id || file.path] = kanbanViewType;
-                this.setKanbanView(leaf);
-              });
+              .onClick(openAsKanban);
           });
         }
 
@@ -484,16 +489,6 @@ export default class KanbanPlugin extends Plugin {
                   .setIcon('lucide-archive')
                   .setSection('pane')
                   .onClick(() => {
-                    stateManager.archiveCompletedCards();
-                  });
-              })
-              .addItem((item) => {
-                item
-                  .setTitle(t('Archive completed cards'))
-                  .setIcon('lucide-archive')
-                  .setSection('pane')
-                  .onClick(() => {
-                    const stateManager = this.stateManagers.get(file);
                     stateManager.archiveCompletedCards();
                   });
               })
