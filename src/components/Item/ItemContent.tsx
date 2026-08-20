@@ -286,7 +286,7 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
     );
   }
 
-  const shouldEditInline = mode === 'expanded' || isPreviewEditing;
+  const shouldEditInline = isPreviewEditing;
 
   return (
     <div
