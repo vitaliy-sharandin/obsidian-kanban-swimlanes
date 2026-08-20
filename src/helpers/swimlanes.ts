@@ -939,8 +939,72 @@ export function setCardColor(board: Board, cardId: string, color: string) {
   return updateCardConfig(board, cardId, { color: color || undefined });
 }
 
-export function setCardDisplayMode(board: Board, cardId: string, displayMode: CardDisplayMode) {
-  return updateCardConfig(board, cardId, { displayMode });
+export function setCardDisplayMode(
+  board: Board,
+  cardId: string,
+  displayMode: CardDisplayMode,
+  previewWidth?: number,
+  previewHeight?: number
+) {
+  return updateCardConfig(board, cardId, {
+    displayMode,
+    ...(displayMode === 'expanded'
+      ? {
+          previewWidth: previewWidth || 420,
+          previewHeight: previewHeight || 360,
+        }
+      : {}),
+  });
+}
+
+export function setAllCardDisplayModes(
+  board: Board,
+  cardIds: string[],
+  displayMode: 'compact' | 'expanded'
+) {
+  const targetIds = new Set(cardIds);
+  const configuredIds = new Set<string>();
+  const cards = (board.data.settings.cards || []).reduce<CardConfig[]>((result, card) => {
+    if (!targetIds.has(card.id)) {
+      result.push(card);
+      return result;
+    }
+    configuredIds.add(card.id);
+
+    if (displayMode === 'expanded') {
+      result.push({
+        ...card,
+        displayMode,
+        previewWidth: card.previewWidth || 420,
+        previewHeight: card.previewHeight || 360,
+      });
+      return result;
+    }
+
+    const compactCard = { ...card };
+    delete compactCard.displayMode;
+    if (Object.keys(compactCard).length > 1) result.push(compactCard);
+    return result;
+  }, []);
+
+  if (displayMode === 'expanded') {
+    targetIds.forEach((id) => {
+      if (!configuredIds.has(id)) {
+        cards.push({ id, displayMode, previewWidth: 420, previewHeight: 360 });
+      }
+    });
+  }
+
+  return update(board, {
+    data: {
+      settings: {
+        $set: {
+          ...board.data.settings,
+          cards,
+        },
+      },
+    },
+  });
 }
 
 export function setCardPreviewSize(

@@ -21,6 +21,7 @@ import {
   addSwimlane,
   deleteColumn,
   deleteSwimlane,
+  getCardConfig,
   getCardId,
   renameColumn,
   renameSwimlane,
@@ -30,6 +31,7 @@ import {
   reorderSwimlane,
   reorderSwimlaneTo,
   reorderSwimlaneToPlacement,
+  setAllCardDisplayModes,
   setCardColor,
   setCardDisplayMode,
   setCardPreviewSize,
@@ -83,6 +85,7 @@ export interface BoardModifiers {
   setColumnColor: (columnId: string, color: string) => void;
   setCardColor: (path: Path, color: string) => void;
   setCardDisplayMode: (path: Path, displayMode: 'compact' | 'preview' | 'expanded') => void;
+  setAllCardDisplayMode: (displayMode: 'compact' | 'expanded') => void;
   setCardPreviewSize: (path: Path, width: number, height: number) => void;
 }
 
@@ -460,10 +463,46 @@ export function getBoardModifiers(view: KanbanView, stateManager: StateManager):
     setCardDisplayMode: (path: Path, displayMode: 'compact' | 'preview' | 'expanded') => {
       stateManager.setState((boardData) => {
         const result = ensureItemBlockId(boardData, path);
+        const cardConfig = getCardConfig(result.boardData, result.item);
         return touchItem(
-          setCardDisplayMode(result.boardData, getCardId(result.item), displayMode),
+          setCardDisplayMode(
+            result.boardData,
+            getCardId(result.item),
+            displayMode,
+            cardConfig?.previewWidth,
+            cardConfig?.previewHeight
+          ),
           path
         );
+      });
+    },
+
+    setAllCardDisplayMode: (displayMode: 'compact' | 'expanded') => {
+      stateManager.setState((boardData) => {
+        const cardIds: string[] = [];
+        const children = boardData.children.map((lane) =>
+          update(lane, {
+            children: {
+              $set: lane.children.map((currentItem) => {
+                let item = currentItem;
+                if (!item.data.blockId) {
+                  item = update(item, {
+                    data: {
+                      blockId: {
+                        $set: generateInstanceId(6),
+                      },
+                    },
+                  });
+                  item = stateManager.updateItemContent(item, item.data.titleRaw);
+                }
+                cardIds.push(getCardId(item));
+                return item;
+              }),
+            },
+          })
+        );
+        const boardWithCardIds = update(boardData, { children: { $set: children } });
+        return setAllCardDisplayModes(boardWithCardIds, cardIds, displayMode);
       });
     },
 

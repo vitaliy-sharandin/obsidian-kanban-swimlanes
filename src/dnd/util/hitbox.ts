@@ -247,7 +247,7 @@ export function closestCorners(entities: Entity[], target: Hitbox) {
 function centerOfRectangle(hitbox: Hitbox): Coordinates {
   return {
     x: (hitbox[0] + hitbox[2]) / 2,
-    y: (hitbox[1] + hitbox[2]) / 2,
+    y: (hitbox[1] + hitbox[3]) / 2,
   };
 }
 

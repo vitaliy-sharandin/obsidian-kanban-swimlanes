@@ -125,18 +125,15 @@ function checkCheckbox(stateManager: StateManager, title: string, checkboxIndex:
   return results.join('\n');
 }
 
-function NotePreview({
-  item,
-  path,
-}: {
-  item: Item;
-  path: Path;
-}) {
-  const { stateManager, boardModifiers } = useContext(KanbanContext);
+function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStatic: boolean }) {
+  const { stateManager, boardModifiers, view } = useContext(KanbanContext);
+  const win = view.getWindow();
   const cardConfig = getCardConfig(stateManager.state, item);
   const mode = cardConfig?.displayMode || 'compact';
   const saveTimerRef = useRef<number | null>(null);
   const draftRef = useRef('');
+  const lastSavedRef = useRef('');
+  const commitRef = useRef<(content: string) => void>(() => {});
   const [isPreviewEditing, setIsPreviewEditing] = useState(false);
   const file =
     item.data.metadata.file ||
@@ -167,8 +164,11 @@ function NotePreview({
       return;
     }
 
+    if (isStatic) return;
+
     if (!file) {
       draftRef.current = item.data.titleRaw;
+      lastSavedRef.current = item.data.titleRaw;
       setMarkdown(item.data.titleRaw);
       return;
     }
@@ -176,6 +176,7 @@ function NotePreview({
     stateManager.app.vault.cachedRead(file).then((content) => {
       if (!cancelled) {
         draftRef.current = content;
+        lastSavedRef.current = content;
         setMarkdown(content);
       }
     });
@@ -183,49 +184,58 @@ function NotePreview({
     return () => {
       cancelled = true;
     };
-  }, [file, item.data.titleRaw, mode, stateManager]);
+  }, [file, isStatic, item.data.titleRaw, mode, stateManager]);
+
+  const commitPreviewContent = useCallback(
+    (content: string) => {
+      if (content === lastSavedRef.current) return;
+      lastSavedRef.current = content;
+
+      if (file) {
+        void stateManager.app.vault.modify(file, content);
+      } else {
+        boardModifiers.updateItem(path, stateManager.updateItemContent(item, content));
+      }
+    },
+    [boardModifiers, file, item, path, stateManager]
+  );
+
+  commitRef.current = commitPreviewContent;
 
   useEffect(() => {
     return () => {
       if (saveTimerRef.current !== null) {
-        window.clearTimeout(saveTimerRef.current);
+        win.clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
       }
+      commitRef.current(draftRef.current);
     };
-  }, []);
+  }, [win]);
 
-  const saveLinkedNote = useCallback(
+  const savePreviewContent = useCallback(
     (content: string) => {
       draftRef.current = content;
-      if (!file) return;
 
       if (saveTimerRef.current !== null) {
-        window.clearTimeout(saveTimerRef.current);
+        win.clearTimeout(saveTimerRef.current);
       }
 
-      saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = win.setTimeout(() => {
         saveTimerRef.current = null;
-        stateManager.app.vault.modify(file, draftRef.current);
+        commitPreviewContent(draftRef.current);
       }, 600);
     },
-    [file, stateManager]
+    [commitPreviewContent, win]
   );
 
-  const flushLinkedNote = useCallback(() => {
-    if (file) {
-      stateManager.app.vault.modify(file, draftRef.current);
+  const flushPreviewContent = useCallback(() => {
+    if (saveTimerRef.current !== null) {
+      win.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
     }
-  }, [file, stateManager]);
-
-  const onPreviewEnter = useCallback(() => false, []);
-  const onPreviewEscape = useCallback(() => {
-    flushLinkedNote();
+    commitPreviewContent(draftRef.current);
     setIsPreviewEditing(false);
-  }, [flushLinkedNote]);
-  const onPreviewSubmit = useCallback(() => {
-    flushLinkedNote();
-    setIsPreviewEditing(false);
-  }, [flushLinkedNote]);
+  }, [commitPreviewContent, win]);
 
   const startResize = useCallback(
     (event: PointerEvent) => {
@@ -263,54 +273,61 @@ function NotePreview({
 
   if (mode === 'compact') return null;
 
+  const previewStyle = {
+    '--note-preview-width': `${size.width}px`,
+    '--note-preview-height': `${size.height}px`,
+  } as any;
+
+  if (isStatic) {
+    return (
+      <div className={c('note-preview-card')} style={previewStyle} aria-hidden={true}>
+        <div className={c('note-preview-content')} />
+      </div>
+    );
+  }
+
   const shouldEditInline = mode === 'expanded' || isPreviewEditing;
 
   return (
     <div
+      // eslint-disable-next-line react/no-unknown-property
+      onDblClick={(event) => event.stopPropagation()}
       className={c('note-preview-card')}
-      style={
-        {
-          '--note-preview-width': `${size.width}px`,
-          '--note-preview-height': `${size.height}px`,
-        } as any
-      }
+      style={previewStyle}
     >
-      {file ? (
-        markdown === null ? (
-          <div className={c('note-preview-content')} />
-        ) : shouldEditInline ? (
-          <div className={c('note-preview-editor')} data-ignore-drag={true}>
-            <MarkdownEditor
-              key={`${file.path}-${mode}`}
-              className={c('note-preview-input')}
-              editState={{ x: 0, y: 0 }}
-              value={markdown}
-              onEnter={onPreviewEnter}
-              onEscape={onPreviewEscape}
-              onSubmit={onPreviewSubmit}
-              onChange={(update) => {
-                if (update.docChanged) {
-                  const value = update.state.doc.toString();
-                  setMarkdown(value);
-                  saveLinkedNote(value);
-                }
-              }}
-            />
-          </div>
-        ) : (
-          <MarkdownRenderer
-            entityId={`${item.id}-note-preview`}
-            className={c('note-preview-content')}
-            markdownString={markdown}
-            data-ignore-drag={true}
-            onDblClick={() => setIsPreviewEditing(true)}
+      {markdown === null ? (
+        <div className={c('note-preview-content')} />
+      ) : shouldEditInline ? (
+        <div className={c('note-preview-editor')} data-ignore-drag={true}>
+          <textarea
+            key={`${file?.path || item.id}-${mode}`}
+            className={c('note-preview-input')}
+            value={markdown}
+            spellCheck={true}
+            onInput={(event) => {
+              const value = (event.currentTarget as HTMLTextAreaElement).value;
+              setMarkdown(value);
+              savePreviewContent(value);
+            }}
+            onBlur={flushPreviewContent}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.stopPropagation();
+                (event.currentTarget as HTMLTextAreaElement).blur();
+              }
+            }}
           />
-        )
+        </div>
       ) : (
         <MarkdownRenderer
           entityId={`${item.id}-note-preview`}
           className={c('note-preview-content')}
-          markdownString={markdown || ''}
+          markdownString={markdown}
+          data-ignore-drag={true}
+          onDblClick={(event) => {
+            event.stopPropagation();
+            setIsPreviewEditing(true);
+          }}
         />
       )}
       <div
@@ -505,7 +522,7 @@ export const ItemContent = memo(function ItemContent({
           <Tags tags={item.data.metadata.tags} searchQuery={searchQuery} />
         </div>
       )}
-      <NotePreview item={item} path={path} />
+      <NotePreview item={item} path={path} isStatic={isStatic} />
     </div>
   );
 });

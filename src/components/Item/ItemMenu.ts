@@ -226,14 +226,7 @@ export function useItemMenu({
                 .setIcon('lucide-expand')
                 .setChecked(cardConfig?.displayMode === 'expanded')
                 .setTitle('Expanded')
-                .onClick(() => {
-                  boardModifiers.setCardDisplayMode(path, 'expanded');
-                  boardModifiers.setCardPreviewSize(
-                    path,
-                    cardConfig?.previewWidth || 420,
-                    cardConfig?.previewHeight || 360
-                  );
-                })
+                .onClick(() => boardModifiers.setCardDisplayMode(path, 'expanded'))
             );
         })
         .addSeparator()

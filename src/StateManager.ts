@@ -26,6 +26,8 @@ export class StateManager {
   file: TFile;
 
   parser: BaseFormat;
+  saveFrame: number | null = null;
+  saveTimer: number | null = null;
 
   constructor(
     app: App,
@@ -97,20 +99,40 @@ export class StateManager {
   }
 
   saveToDisk() {
-    if (this.state.data.errors.length > 0) {
-      return;
-    }
-
     const view = this.getAView();
+    const fileStr = this.getLatestSerializedData();
 
-    if (view) {
-      const fileStr = this.parser.boardToMd(this.state);
+    if (view && fileStr !== null) {
       view.requestSaveToDisk(fileStr);
-
-      this.viewSet.forEach((view) => {
-        view.data = fileStr;
-      });
     }
+  }
+
+  getLatestSerializedData(): string | null {
+    if (this.state.data.errors.length > 0) return null;
+
+    const fileStr = this.parser.boardToMd(this.state);
+    this.viewSet.forEach((view) => {
+      view.data = fileStr;
+    });
+    return fileStr;
+  }
+
+  hasScheduledSave() {
+    return this.saveFrame !== null || this.saveTimer !== null;
+  }
+
+  scheduleSaveToDisk() {
+    const view = this.getAView();
+    if (!view || this.saveFrame !== null || this.saveTimer !== null) return;
+
+    const win = view.getWindow();
+    this.saveFrame = win.requestAnimationFrame(() => {
+      this.saveFrame = null;
+      this.saveTimer = win.setTimeout(() => {
+        this.saveTimer = null;
+        this.saveToDisk();
+      }, 0);
+    });
   }
 
   softRefresh() {
@@ -161,10 +183,6 @@ export class StateManager {
         view.validatePreviewCache(newState);
       });
 
-      if (shouldSave) {
-        this.saveToDisk();
-      }
-
       this.stateReceivers.forEach((receiver) => receiver(this.state));
 
       if (oldSettings !== newSettings && newSettings) {
@@ -173,6 +191,10 @@ export class StateManager {
             notifiers.forEach((fn) => fn());
           }
         });
+      }
+
+      if (shouldSave) {
+        this.scheduleSaveToDisk();
       }
     } catch (e) {
       console.error(e);

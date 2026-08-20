@@ -381,6 +381,39 @@ button.kanban-swimlanes-plugin__search-cancel-button .kanban-swimlanes-plugin__i
   }
 }
 
+.kanban-swimlanes-plugin__swimlane-card-display-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.kanban-swimlanes-plugin__swimlane-card-display-button {
+  height: 36px;
+  padding-inline: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: color-mix(in srgb, var(--background-secondary) 76%, transparent);
+  color: var(--text-muted);
+  white-space: nowrap;
+
+  .kanban-swimlanes-plugin__icon {
+    display: flex;
+  }
+
+  &:hover:not(:disabled),
+  &:focus-visible:not(:disabled) {
+    border-color: color-mix(in srgb, var(--interactive-accent) 58%, transparent);
+    background-color: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+    color: var(--text-normal);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+  }
+}
+
 .kanban-swimlanes-plugin__swimlane-add-menu-button {
   flex: 0 0 36px;
   width: 36px;
@@ -1565,7 +1598,7 @@ button.kanban-swimlanes-plugin__new-item-button {
 
 .kanban-swimlanes-plugin__note-preview-editor {
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
 
   .markdown-source-view.mod-cm6 {
     min-height: 100%;
@@ -1591,7 +1624,22 @@ button.kanban-swimlanes-plugin__new-item-button {
   width: 100%;
   min-height: 100%;
   height: 100%;
+  margin: 0;
+  padding: var(--size-4-2);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   background-color: transparent;
+  color: var(--text-normal);
+  font-family: var(--font-text);
+  font-size: var(--font-text-size);
+  line-height: var(--line-height-normal);
+  resize: none;
+
+  &:focus {
+    border: 0;
+    box-shadow: none;
+  }
 }
 
 .kanban-swimlanes-plugin__note-preview-resize {
@@ -2800,6 +2848,16 @@ body:not(.native-scrollbars) .kanban-swimlanes-plugin__scroll-container::-webkit
 
     input {
       font-size: 16px;
+    }
+  }
+
+  .kanban-swimlanes-plugin__swimlane-card-display-button {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+
+    span:not(.kanban-swimlanes-plugin__icon) {
+      display: none;
     }
   }
 

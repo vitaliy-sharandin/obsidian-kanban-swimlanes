@@ -114,15 +114,8 @@ const ItemInner = memo(function ItemInner({
   const setDisplayMode = useCallback(
     (displayMode: 'compact' | 'expanded') => {
       boardModifiers.setCardDisplayMode(path, displayMode);
-      if (displayMode === 'expanded') {
-        boardModifiers.setCardPreviewSize(
-          path,
-          cardConfig?.previewWidth || 420,
-          cardConfig?.previewHeight || 360
-        );
-      }
     },
-    [boardModifiers, cardConfig?.previewHeight, cardConfig?.previewWidth, path]
+    [boardModifiers, path]
   );
 
   return (

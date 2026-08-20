@@ -214,6 +214,11 @@ export class KanbanView extends TextFileView implements HoverParent {
   }
 
   getViewData() {
+    const stateManager = this.plugin.stateManagers.get(this.file);
+    if (stateManager?.hasScheduledSave()) {
+      return stateManager.getLatestSerializedData() ?? this.data;
+    }
+
     // In theory, we could unparse the board here.  In practice, the board can be
     // in an error state, so we return the last good data here.  (In addition,
     // unparsing is slow, and getViewData() can be called more often than the

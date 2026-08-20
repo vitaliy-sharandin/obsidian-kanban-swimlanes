@@ -10,6 +10,7 @@ import { rafThrottle } from '../util/animation';
 import { createHTMLDndEntity } from '../util/createHTMLDndEntity';
 import {
   adjustHitboxForMovement,
+  closestCenter,
   distanceBetween,
   getBestIntersect,
   getScrollIntersection,
@@ -213,7 +214,13 @@ export class DragManager {
     );
 
     if (!isScrolling) {
-      this.handleHitboxIntersect(dragHitbox, this.dragEntity, hitboxHitboxes, hitboxEntities);
+      this.handleHitboxIntersect(
+        dragHitbox,
+        this.dragPosition,
+        this.dragEntity,
+        hitboxHitboxes,
+        hitboxEntities
+      );
     }
   }
 
@@ -305,15 +312,28 @@ export class DragManager {
 
   handleHitboxIntersect(
     dragHitbox: Hitbox,
+    dragPosition: Coordinates,
     dragEntity: Entity,
     hitboxes: Hitbox[],
     hitboxEntities: Entity[]
   ) {
-    const hits: Entity[] = boxIntersect([dragHitbox], hitboxes).map(
+    const pointerHitbox: Hitbox = [
+      dragPosition.x - 6,
+      dragPosition.y - 6,
+      dragPosition.x + 6,
+      dragPosition.y + 6,
+    ];
+    const pointerHits: Entity[] = boxIntersect([pointerHitbox], hitboxes)
+      .map((match) => hitboxEntities[match[1]])
+      .filter((entity) => entity.entityId !== dragEntity.entityId);
+    const overlapHits: Entity[] = boxIntersect([dragHitbox], hitboxes).map(
       (match) => hitboxEntities[match[1]]
     );
+    const hits = pointerHits.length ? pointerHits : overlapHits;
 
-    const primaryIntersection = getBestIntersect(hits, dragHitbox, dragEntity);
+    const primaryIntersection = pointerHits.length
+      ? closestCenter(pointerHits, pointerHitbox)
+      : getBestIntersect(hits, dragHitbox, dragEntity);
 
     if (this.primaryIntersection && this.primaryIntersection !== primaryIntersection) {
       this.emitter.emit('dragLeave', this.getDragEventData(), this.primaryIntersection.entityId);
@@ -432,6 +452,7 @@ export function useDragHandle(
             ) {
               dndManager.dragManager.dragStart(initialEvent, droppable);
               isDragging = true;
+              dndManager.dragManager.dragMove(e);
             }
           } else {
             dndManager.dragManager.dragMove(e);

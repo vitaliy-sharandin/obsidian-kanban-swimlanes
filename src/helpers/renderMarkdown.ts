@@ -1,7 +1,84 @@
-import { Keymap, Menu } from 'obsidian';
+import { HoverPopover, Keymap, Menu } from 'obsidian';
 import { KanbanView } from 'src/KanbanView';
 
 const noBreakSpace = /\u00A0/g;
+const hoverPopoverGap = 10;
+const hoverPopoverViewportPadding = 10;
+
+type PositionableHoverPopover = HoverPopover & {
+  position?: () => void;
+  targetEl?: HTMLElement | null;
+};
+
+function positionHoverPopoverNearTarget(popover: PositionableHoverPopover, targetEl: HTMLElement) {
+  const hoverEl = popover.hoverEl;
+  const targetDocument = targetEl.ownerDocument;
+
+  if (!hoverEl.isConnected || hoverEl.ownerDocument !== targetDocument) return;
+
+  const win = targetDocument.defaultView;
+  if (!win) return;
+
+  const targetRect = targetEl.getBoundingClientRect();
+  const hoverRect = hoverEl.getBoundingClientRect();
+  const availableAbove = targetRect.top - hoverPopoverGap - hoverPopoverViewportPadding;
+  const availableBelow =
+    win.innerHeight - targetRect.bottom - hoverPopoverGap - hoverPopoverViewportPadding;
+
+  let viewportTop: number;
+  if (availableBelow >= hoverRect.height) {
+    viewportTop = targetRect.bottom + hoverPopoverGap;
+  } else if (availableAbove >= hoverRect.height) {
+    viewportTop = targetRect.top - hoverPopoverGap - hoverRect.height;
+  } else if (availableBelow >= availableAbove) {
+    viewportTop = targetRect.bottom + hoverPopoverGap;
+  } else {
+    viewportTop = Math.max(
+      hoverPopoverViewportPadding,
+      targetRect.top - hoverPopoverGap - hoverRect.height
+    );
+  }
+
+  const offsetParent = hoverEl.offsetParent as HTMLElement | null;
+  const offsetParentRect = offsetParent?.getBoundingClientRect();
+  const offsetParentTop = offsetParentRect?.top ?? 0;
+  const offsetParentScrollTop = offsetParent?.scrollTop ?? 0;
+
+  hoverEl.style.top = `${viewportTop - offsetParentTop + offsetParentScrollTop}px`;
+  hoverEl.style.bottom = '';
+}
+
+function keepHoverPopoverNearTarget(view: KanbanView, targetEl: HTMLElement) {
+  const win = targetEl.ownerDocument.defaultView;
+  if (!win) return;
+
+  const startedAt = win.performance.now();
+  const findPopover = () => {
+    if (!targetEl.isConnected || !targetEl.matches(':hover')) return;
+
+    const popover = view.hoverPopover as PositionableHoverPopover | null;
+    if (!popover || (popover.targetEl && popover.targetEl !== targetEl)) {
+      if (win.performance.now() - startedAt < 1000) {
+        win.setTimeout(findPopover, 50);
+      }
+      return;
+    }
+
+    if (popover.hoverEl.dataset.kanbanSwimlanesPositioned === 'true') return;
+
+    popover.hoverEl.dataset.kanbanSwimlanesPositioned = 'true';
+    if (typeof popover.position === 'function') {
+      const position = popover.position.bind(popover);
+      popover.position = () => {
+        position();
+        positionHoverPopoverNearTarget(popover, targetEl);
+      };
+    }
+    positionHoverPopoverNearTarget(popover, targetEl);
+  };
+
+  findPopover();
+}
 
 interface NormalizedPath {
   root: string;
@@ -85,6 +162,7 @@ export function bindMarkdownEvents(view: KanbanView) {
       linktext: link.href,
       sourcePath: view.file.path,
     });
+    keepHoverPopoverNearTarget(view, targetEl);
   });
   contentEl.on('click', 'a.external-link', (evt: MouseEvent, targetEl: HTMLElement) => {
     const link = parseLink(targetEl);

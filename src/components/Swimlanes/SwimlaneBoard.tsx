@@ -18,6 +18,7 @@ import { c } from 'src/components/helpers';
 import { Board, ColumnConfig, EditState, Item, SwimlaneConfig } from 'src/components/types';
 import {
   getCellLane,
+  getCardConfig,
   getRenderableColumnConfigs,
   getRenderableSwimlaneConfigs,
   getSwimlaneDepth,
@@ -274,6 +275,20 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
 
     return { columnCounts, swimlaneCounts, total };
   }, [boardData]);
+  const cardDisplayState = useMemo(() => {
+    let allExpanded = counts.total > 0;
+    let allCompact = counts.total > 0;
+
+    boardData.children.forEach((lane) => {
+      lane.children.forEach((item) => {
+        const displayMode = getCardConfig(boardData, item)?.displayMode || 'compact';
+        allExpanded = allExpanded && displayMode === 'expanded';
+        allCompact = allCompact && displayMode === 'compact';
+      });
+    });
+
+    return { allExpanded, allCompact };
+  }, [boardData, counts.total]);
   const [dragState, setDragState] = useState<HeaderDragState | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const layoutRectsRef = useRef<Map<string, DOMRect> | null>(null);
@@ -1063,6 +1078,28 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
               <Icon name="lucide-x" />
             </button>
           )}
+        </div>
+        <div className={c('swimlane-card-display-actions')}>
+          <button
+            className={c('swimlane-card-display-button')}
+            aria-label="Expand all cards"
+            title="Expand all cards"
+            disabled={counts.total === 0 || cardDisplayState.allExpanded}
+            onClick={() => boardModifiers.setAllCardDisplayMode('expanded')}
+          >
+            <Icon name="lucide-expand" />
+            <span>Expand all</span>
+          </button>
+          <button
+            className={c('swimlane-card-display-button')}
+            aria-label="Collapse all cards"
+            title="Collapse all cards"
+            disabled={counts.total === 0 || cardDisplayState.allCompact}
+            onClick={() => boardModifiers.setAllCardDisplayMode('compact')}
+          >
+            <Icon name="lucide-minimize-2" />
+            <span>Collapse all</span>
+          </button>
         </div>
         <button
           className={c('swimlane-add-menu-button')}
