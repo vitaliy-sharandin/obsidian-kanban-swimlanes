@@ -134,7 +134,10 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
   const draftRef = useRef('');
   const lastSavedRef = useRef('');
   const commitRef = useRef<(content: string) => void>(() => {});
-  const [isPreviewEditing, setIsPreviewEditing] = useState(false);
+  const [previewEditPosition, setPreviewEditPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const file =
     item.data.metadata.file ||
     (item.data.metadata.fileAccessor
@@ -160,7 +163,7 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
     let cancelled = false;
     if (mode === 'compact') {
       setMarkdown(null);
-      setIsPreviewEditing(false);
+      setPreviewEditPosition(null);
       return;
     }
 
@@ -234,7 +237,7 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
       saveTimerRef.current = null;
     }
     commitPreviewContent(draftRef.current);
-    setIsPreviewEditing(false);
+    setPreviewEditPosition(null);
   }, [commitPreviewContent, win]);
 
   const startResize = useCallback(
@@ -286,7 +289,7 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
     );
   }
 
-  const shouldEditInline = isPreviewEditing;
+  const shouldEditInline = previewEditPosition !== null;
 
   return (
     <div
@@ -299,21 +302,21 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
         <div className={c('note-preview-content')} />
       ) : shouldEditInline ? (
         <div className={c('note-preview-editor')} data-ignore-drag={true}>
-          <textarea
+          <MarkdownEditor
             key={`${file?.path || item.id}-${mode}`}
             className={c('note-preview-input')}
+            editState={previewEditPosition}
             value={markdown}
-            spellCheck={true}
-            onInput={(event) => {
-              const value = (event.currentTarget as HTMLTextAreaElement).value;
-              setMarkdown(value);
-              savePreviewContent(value);
-            }}
+            sourceFile={file || undefined}
+            onEnter={() => false}
+            onEscape={flushPreviewContent}
+            onSubmit={flushPreviewContent}
             onBlur={flushPreviewContent}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.stopPropagation();
-                (event.currentTarget as HTMLTextAreaElement).blur();
+            onChange={(update) => {
+              if (update.docChanged) {
+                const value = update.state.doc.toString();
+                setMarkdown(value);
+                savePreviewContent(value);
               }
             }}
           />
@@ -326,7 +329,7 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
           data-ignore-drag={true}
           onDblClick={(event) => {
             event.stopPropagation();
-            setIsPreviewEditing(true);
+            setPreviewEditPosition({ x: event.clientX, y: event.clientY });
           }}
         />
       )}

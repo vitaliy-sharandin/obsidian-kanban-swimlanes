@@ -1,5 +1,7 @@
-# Kanban Swimlanes 1.0.5
+# Kanban Swimlanes 1.0.6
 
-- Fixed expanded notes and cards displaying raw Markdown instead of rendered content.
-- Expanded content now shows formatted Markdown by default.
-- Double-click rendered content to edit it inline; blur the editor or press **Escape** to return to the rendered view.
+- Replaced the plain raw Markdown textarea with Obsidian's native CodeMirror Live Preview editor for expanded notes and cards.
+- Double-click rendered content to edit it inline at the selected position.
+- Blur the editor or press **Escape** to save changes and return to the rendered view.
+- Linked-note editing now resolves links and embeds relative to the linked note itself.
+- Kept the editor lazy-loaded so **Expand all** remains responsive.

@@ -2,7 +2,7 @@ import { insertBlankLine } from '@codemirror/commands';
 import { EditorSelection, Extension, Prec } from '@codemirror/state';
 import { EditorView, ViewUpdate, keymap, placeholder as placeholderExt } from '@codemirror/view';
 import classcat from 'classcat';
-import { EditorPosition, Editor as ObsidianEditor, Platform } from 'obsidian';
+import { EditorPosition, Editor as ObsidianEditor, Platform, TFile } from 'obsidian';
 import { MutableRefObject, useContext, useEffect, useRef } from 'preact/compat';
 import { KanbanView } from 'src/KanbanView';
 import { StateManager } from 'src/StateManager';
@@ -22,9 +22,11 @@ interface MarkdownEditorProps {
   onSubmit: (cm: EditorView) => void;
   onPaste?: (e: ClipboardEvent, cm: EditorView) => void;
   onChange?: (update: ViewUpdate) => void;
+  onBlur?: () => void;
   value?: string;
   className: string;
   placeholder?: string;
+  sourceFile?: TFile;
 }
 
 export function allowNewLine(stateManager: StateManager, mod: boolean, shift: boolean) {
@@ -59,7 +61,8 @@ function getEditorAppProxy(view: KanbanView) {
 
 function getMarkdownController(
   view: KanbanView,
-  getEditor: () => ObsidianEditor
+  getEditor: () => ObsidianEditor,
+  sourceFile?: TFile
 ): Record<any, any> {
   return {
     app: view.app,
@@ -73,10 +76,10 @@ function getMarkdownController(
       return getEditor();
     },
     get file() {
-      return view.file;
+      return sourceFile || view.file;
     },
     get path() {
-      return view.file.path;
+      return (sourceFile || view.file).path;
     },
   };
 }
@@ -100,12 +103,14 @@ export function MarkdownEditor({
   onEnter,
   onEscape,
   onChange,
+  onBlur,
   onPaste,
   className,
   onSubmit,
   editState,
   value,
   placeholder,
+  sourceFile,
 }: MarkdownEditorProps) {
   const { view, stateManager } = useContext(KanbanContext);
   const elRef = useRef<HTMLDivElement>();
@@ -158,6 +163,7 @@ export function MarkdownEditor({
                   view.contentEl.removeClass('is-mobile-editing');
                   this.app.mobileToolbar.update();
                 }
+                onBlur?.();
                 return true;
               },
             })
@@ -217,7 +223,7 @@ export function MarkdownEditor({
       }
     }
 
-    const controller = getMarkdownController(view, () => editor.editor);
+    const controller = getMarkdownController(view, () => editor.editor, sourceFile);
     const app = getEditorAppProxy(view);
     const editor = view.plugin.addChild(new (Editor as any)(app, elRef.current, controller));
     const cm: EditorView = editor.cm;
