@@ -1,5 +1,4 @@
-# Kanban Swimlanes 1.0.9
+# Kanban Swimlanes 1.0.10
 
-- Fixed cards and linked notes snapping back to their original group after being dropped into the open area of another swimlane cell.
-- Kept precise placement reliable by prioritizing an existing card or placeholder over the broader cell drop area.
-- Highlighted the destination swimlane and cell while dragging, making the target group clear before drop.
+- Limited drag-target highlighting to the destination cell instead of outlining the entire swimlane.
+- Removed the duplicate inner drop outline so each target cell displays one clear border.

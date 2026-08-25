@@ -581,16 +581,6 @@ button.kanban-swimlanes-plugin__search-cancel-button .kanban-swimlanes-plugin__i
   );
 }
 
-.kanban-swimlanes-plugin__swimlane-row-frame.is-item-drop-target {
-  z-index: 3;
-  outline: 2px solid color-mix(in srgb, var(--interactive-accent) 88%, transparent);
-  outline-offset: -3px;
-  background-color: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 26%, transparent),
-    0 0 0 3px color-mix(in srgb, var(--interactive-accent) 8%, transparent);
-}
-
 .kanban-swimlanes-plugin__swimlane-board.is-columns-only
   .kanban-swimlanes-plugin__swimlane-row-frame.is-implicit-hidden,
 .kanban-swimlanes-plugin__swimlane-board.is-swimlanes-only
@@ -1002,6 +992,12 @@ button.kanban-swimlanes-plugin__swimlane-row-header:focus-visible {
   &.is-item-drop-target {
     outline-color: color-mix(in srgb, var(--interactive-accent) 88%, transparent);
     background-color: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  }
+
+  > .kanban-swimlanes-plugin__lane-wrapper.is-dropping > .kanban-swimlanes-plugin__lane {
+    border-color: transparent;
+    outline: 0;
+    background-color: transparent;
   }
 
   > .kanban-swimlanes-plugin__lane-wrapper {

@@ -1240,7 +1240,6 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
                 'is-implicit-hidden': hideSwimlaneHeaders && isImplicitDefaultSwimlane(swimlane),
                 'is-sub-swimlane': (swimlaneDepths.get(swimlane.id) || 0) > 0,
                 'has-sub-swimlanes': swimlaneChildCounts.has(swimlane.id),
-                'is-item-drop-target': itemDropTarget?.swimlaneId === swimlane.id,
                 ...getHeaderDragClasses('swimlane', swimlane.id),
               },
             ])}
