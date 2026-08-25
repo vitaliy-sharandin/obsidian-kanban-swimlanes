@@ -1,5 +1,6 @@
 import update from 'immutability-helper';
 import { KanbanSettings } from 'src/Settings';
+import { generateInstanceId } from 'src/components/helpers';
 import {
   Board,
   CardConfig,
@@ -10,7 +11,6 @@ import {
   LaneTemplate,
   SwimlaneConfig,
 } from 'src/components/types';
-import { generateInstanceId } from 'src/components/helpers';
 
 export const swimlanesFormat = 'swimlanes-v1';
 export const defaultSwimlaneId = 'default';
@@ -147,7 +147,10 @@ export function sortSwimlaneConfigs(configs: SwimlaneConfig[]) {
   return result;
 }
 
-export function getSwimlaneDescendantIds(swimlanes: SwimlaneConfig[], swimlaneId: string): string[] {
+export function getSwimlaneDescendantIds(
+  swimlanes: SwimlaneConfig[],
+  swimlaneId: string
+): string[] {
   const childrenByParent = new Map<string, SwimlaneConfig[]>();
   swimlanes.forEach((swimlane) => {
     if (!swimlane.parentId) return;
@@ -290,9 +293,22 @@ export function getCardId(item: Item) {
   return item.data.blockId || item.id;
 }
 
+const cardConfigIndexes = new WeakMap<CardConfig[], Map<string, CardConfig>>();
+
 export function getCardConfig(board: Board, item: Item): CardConfig | undefined {
-  const cards = board.data.settings.cards || [];
-  return cards.find((card) => card.id === item.data.blockId) || cards.find((card) => card.id === item.id);
+  const cards = board.data.settings.cards;
+  if (!cards?.length) return undefined;
+
+  let index = cardConfigIndexes.get(cards);
+  if (!index) {
+    index = new Map();
+    cards.forEach((card) => {
+      if (!index.has(card.id)) index.set(card.id, card);
+    });
+    cardConfigIndexes.set(cards, index);
+  }
+
+  return (item.data.blockId ? index.get(item.data.blockId) : undefined) || index.get(item.id);
 }
 
 export function normalizeSwimlaneBoard(board: Board): Board {
@@ -400,9 +416,8 @@ export function convertBoardToSwimlanes(board: Board) {
 export function addSwimlane(board: Board, title: string, parentId?: string) {
   const columns = getRenderableColumnConfigs(board);
   const swimlanes = getSwimlaneConfigs(board);
-  const normalizedParentId = parentId && swimlanes.some((swimlane) => swimlane.id === parentId)
-    ? parentId
-    : undefined;
+  const normalizedParentId =
+    parentId && swimlanes.some((swimlane) => swimlane.id === parentId) ? parentId : undefined;
   const shouldReplaceImplicitDefault =
     !normalizedParentId && swimlanes.length === 1 && isImplicitDefaultSwimlane(swimlanes[0]);
   const siblingSwimlanes = swimlanes.filter(
@@ -490,8 +505,7 @@ export function setSwimlaneCollapsed(board: Board, swimlaneId: string, collapsed
 export function addColumn(board: Board, title: string) {
   const columns = getColumnConfigs(board);
   const swimlanes = getRenderableSwimlaneConfigs(board);
-  const shouldReplaceImplicitDefault =
-    columns.length === 1 && isImplicitDefaultColumn(columns[0]);
+  const shouldReplaceImplicitDefault = columns.length === 1 && isImplicitDefaultColumn(columns[0]);
   const columnTitle = uniqueConfigTitle(
     title,
     columns,
@@ -639,7 +653,12 @@ export function reorderSwimlane(board: Board, swimlaneId: string, direction: -1 
   const target = siblings[index + direction];
   if (index < 0 || !target) return board;
 
-  return reorderSwimlaneToPlacement(board, swimlaneId, target.id, direction > 0 ? 'after' : 'before');
+  return reorderSwimlaneToPlacement(
+    board,
+    swimlaneId,
+    target.id,
+    direction > 0 ? 'after' : 'before'
+  );
 }
 
 export function reorderSwimlaneTo(board: Board, sourceId: string, targetId: string) {
@@ -843,7 +862,11 @@ export function deleteSwimlane(board: Board, swimlaneId: string, moveToSwimlaneI
     });
 
     workingBoard.children.forEach((lane) => {
-      if (!lane.data.swimlaneId || !sourceIdSet.has(lane.data.swimlaneId) || !lane.children.length) {
+      if (
+        !lane.data.swimlaneId ||
+        !sourceIdSet.has(lane.data.swimlaneId) ||
+        !lane.children.length
+      ) {
         return;
       }
       const target = getCellLane(workingBoard, moveToSwimlaneId, lane.data.columnId);
@@ -963,48 +986,64 @@ export function setCardDisplayMode(
 
 export function setAllCardDisplayModes(
   board: Board,
-  cardIds: string[],
+  targets: Array<{ id: string; aliases?: string[] }>,
   displayMode: 'compact' | 'expanded'
 ) {
-  const targetIds = new Set(cardIds);
-  const configuredIds = new Set<string>();
-  const cards = (board.data.settings.cards || []).reduce<CardConfig[]>((result, card) => {
-    if (!targetIds.has(card.id)) {
-      result.push(card);
-      return result;
-    }
-    configuredIds.add(card.id);
+  const cards = board.data.settings.cards || [];
+  const uniqueTargets = new Map<string, Set<string>>();
+  targets.forEach(({ id, aliases = [] }) => {
+    const targetAliases = uniqueTargets.get(id) || new Set<string>();
+    aliases.forEach((alias) => {
+      if (alias !== id) targetAliases.add(alias);
+    });
+    uniqueTargets.set(id, targetAliases);
+  });
+
+  const canonicalIds = new Set(uniqueTargets.keys());
+  const canonicalByConfigId = new Map<string, string>();
+  uniqueTargets.forEach((aliases, id) => {
+    canonicalByConfigId.set(id, id);
+    aliases.forEach((alias) => {
+      if (!canonicalIds.has(alias)) canonicalByConfigId.set(alias, id);
+    });
+  });
+
+  const configsById = new Map<string, CardConfig>();
+  cards.forEach((card) => {
+    if (!configsById.has(card.id)) configsById.set(card.id, card);
+  });
+
+  const nextCards = cards.filter((card) => !canonicalByConfigId.has(card.id));
+  uniqueTargets.forEach((aliases, id) => {
+    let card: CardConfig = { id };
+    aliases.forEach((alias) => {
+      const aliasConfig = configsById.get(alias);
+      if (aliasConfig) card = { ...card, ...aliasConfig, id };
+    });
+
+    const canonicalConfig = configsById.get(id);
+    if (canonicalConfig) card = { ...card, ...canonicalConfig, id };
 
     if (displayMode === 'expanded') {
-      result.push({
+      nextCards.push({
         ...card,
         displayMode,
         previewWidth: card.previewWidth || 420,
         previewHeight: card.previewHeight || 360,
       });
-      return result;
+      return;
     }
 
-    const compactCard = { ...card };
-    delete compactCard.displayMode;
-    if (Object.keys(compactCard).length > 1) result.push(compactCard);
-    return result;
-  }, []);
-
-  if (displayMode === 'expanded') {
-    targetIds.forEach((id) => {
-      if (!configuredIds.has(id)) {
-        cards.push({ id, displayMode, previewWidth: 420, previewHeight: 360 });
-      }
-    });
-  }
+    delete card.displayMode;
+    if (Object.keys(card).length > 1) nextCards.push(card);
+  });
 
   return update(board, {
     data: {
       settings: {
         $set: {
           ...board.data.settings,
-          cards,
+          cards: nextCards,
         },
       },
     },

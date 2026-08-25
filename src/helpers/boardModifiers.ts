@@ -37,8 +37,8 @@ import {
   setCardDisplayMode,
   setCardPreviewSize,
   setColumnColor,
-  setSwimlaneColor,
   setSwimlaneCollapsed,
+  setSwimlaneColor,
 } from './swimlanes';
 
 export interface BoardModifiers {
@@ -412,7 +412,9 @@ export function getBoardModifiers(view: KanbanView, stateManager: StateManager):
     },
 
     reorderColumnTo: (sourceColumnId: string, targetColumnId: string) => {
-      stateManager.setState((boardData) => reorderColumnTo(boardData, sourceColumnId, targetColumnId));
+      stateManager.setState((boardData) =>
+        reorderColumnTo(boardData, sourceColumnId, targetColumnId)
+      );
     },
 
     reorderSwimlaneToPlacement: (
@@ -481,31 +483,46 @@ export function getBoardModifiers(view: KanbanView, stateManager: StateManager):
 
     setAllCardDisplayMode: (displayMode: 'compact' | 'expanded') => {
       stateManager.setState((boardData) => {
-        const cardIds: string[] = [];
-        const children = boardData.children.map((lane) =>
-          update(lane, {
-            children: {
-              $set: lane.children.map((currentItem) => {
-                if (!isLinkedNoteItem(currentItem)) return currentItem;
-                let item = currentItem;
-                if (!item.data.blockId) {
-                  item = update(item, {
-                    data: {
-                      blockId: {
-                        $set: generateInstanceId(6),
-                      },
-                    },
-                  });
-                  item = stateManager.updateItemContent(item, item.data.titleRaw);
-                }
-                cardIds.push(getCardId(item));
-                return item;
-              }),
-            },
-          })
-        );
+        const targets: Array<{ id: string; aliases?: string[] }> = [];
+        const children = boardData.children.map((lane) => {
+          let laneChanged = false;
+          const items = lane.children.map((currentItem) => {
+            if (!isLinkedNoteItem(currentItem)) return currentItem;
+            const currentMode = getCardConfig(boardData, currentItem)?.displayMode || 'compact';
+            if (currentMode === displayMode) return currentItem;
+
+            let item = currentItem;
+            if (displayMode === 'expanded' && !item.data.blockId) {
+              item = update(item, {
+                data: {
+                  blockId: {
+                    $set: generateInstanceId(6),
+                  },
+                },
+              });
+            }
+
+            const id = getCardId(item);
+            targets.push({ id, aliases: currentItem.id === id ? [] : [currentItem.id] });
+            laneChanged = true;
+
+            // Card rendering reads display settings from StateManager. Touch every changed
+            // note so memoized item components render the new mode immediately.
+            return { ...item };
+          });
+
+          return laneChanged
+            ? update(lane, {
+                children: {
+                  $set: items,
+                },
+              })
+            : lane;
+        });
+        if (!targets.length) return boardData;
+
         const boardWithCardIds = update(boardData, { children: { $set: children } });
-        return setAllCardDisplayModes(boardWithCardIds, cardIds, displayMode);
+        return setAllCardDisplayModes(boardWithCardIds, targets, displayMode);
       });
     },
 

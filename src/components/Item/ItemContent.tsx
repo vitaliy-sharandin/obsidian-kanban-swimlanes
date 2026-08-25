@@ -12,6 +12,7 @@ import {
 } from 'preact/hooks';
 import { StateManager } from 'src/StateManager';
 import { useNestedEntityPath } from 'src/dnd/components/Droppable';
+import { EntityManagerContext } from 'src/dnd/components/context';
 import { Path } from 'src/dnd/types';
 import { getCardConfig, isLinkedNoteItem } from 'src/helpers/swimlanes';
 import { getTaskStatusDone, toggleTaskString } from 'src/parsers/helpers/inlineMetadata';
@@ -127,6 +128,7 @@ function checkCheckbox(stateManager: StateManager, title: string, checkboxIndex:
 
 function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStatic: boolean }) {
   const { stateManager, boardModifiers, view } = useContext(KanbanContext);
+  const entityManager = useContext(EntityManagerContext);
   const win = view.getWindow();
   const cardConfig = getCardConfig(stateManager.state, item);
   const mode = cardConfig?.displayMode || 'compact';
@@ -148,6 +150,7 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
         )
       : null);
   const [markdown, setMarkdown] = useState<string | null>(null);
+  const [isVisible, setIsVisible] = useState(entityManager?.isVisible ?? true);
   const [size, setSize] = useState({
     width: cardConfig?.previewWidth || (mode === 'expanded' ? 420 : 280),
     height: cardConfig?.previewHeight || (mode === 'expanded' ? 360 : 180),
@@ -161,6 +164,19 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
   }, [cardConfig?.previewWidth, cardConfig?.previewHeight, mode]);
 
   useEffect(() => {
+    if (!entityManager) {
+      setIsVisible(true);
+      return;
+    }
+
+    const onVisibilityChange = (visible: boolean) => setIsVisible(visible);
+    setIsVisible(entityManager.isVisible);
+    entityManager.emitter.on('visibility-change', onVisibilityChange);
+
+    return () => entityManager.emitter.off('visibility-change', onVisibilityChange);
+  }, [entityManager]);
+
+  useEffect(() => {
     let cancelled = false;
     if (mode === 'compact' || !hasLinkedNote) {
       setMarkdown(null);
@@ -168,7 +184,7 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
       return;
     }
 
-    if (isStatic) return;
+    if (isStatic || !isVisible) return;
 
     if (!file) return;
 
@@ -183,7 +199,7 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
     return () => {
       cancelled = true;
     };
-  }, [file, hasLinkedNote, isStatic, mode, stateManager]);
+  }, [file, hasLinkedNote, isStatic, isVisible, mode, stateManager]);
 
   const commitPreviewContent = useCallback(
     (content: string) => {
