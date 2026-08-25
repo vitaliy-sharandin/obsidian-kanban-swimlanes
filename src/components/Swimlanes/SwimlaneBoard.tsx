@@ -23,6 +23,7 @@ import {
   getRenderableSwimlaneConfigs,
   getSwimlaneDepth,
   getSwimlaneDragGroupIds,
+  isLinkedNoteItem,
   isImplicitDefaultColumn,
   isImplicitDefaultSwimlane,
   unassignedColumnId,
@@ -276,19 +277,26 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
     return { columnCounts, swimlaneCounts, total };
   }, [boardData]);
   const cardDisplayState = useMemo(() => {
-    let allExpanded = counts.total > 0;
-    let allCompact = counts.total > 0;
+    let noteCount = 0;
+    let allExpanded = true;
+    let allCompact = true;
 
     boardData.children.forEach((lane) => {
       lane.children.forEach((item) => {
+        if (!isLinkedNoteItem(item)) return;
+        noteCount += 1;
         const displayMode = getCardConfig(boardData, item)?.displayMode || 'compact';
         allExpanded = allExpanded && displayMode === 'expanded';
         allCompact = allCompact && displayMode === 'compact';
       });
     });
 
-    return { allExpanded, allCompact };
-  }, [boardData, counts.total]);
+    return {
+      noteCount,
+      allExpanded: noteCount > 0 && allExpanded,
+      allCompact: noteCount > 0 && allCompact,
+    };
+  }, [boardData]);
   const [dragState, setDragState] = useState<HeaderDragState | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const layoutRectsRef = useRef<Map<string, DOMRect> | null>(null);
@@ -1082,9 +1090,9 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
         <div className={c('swimlane-card-display-actions')}>
           <button
             className={c('swimlane-card-display-button')}
-            aria-label="Expand all cards"
-            title="Expand all cards"
-            disabled={counts.total === 0 || cardDisplayState.allExpanded}
+            aria-label="Expand all notes"
+            title="Expand all notes"
+            disabled={cardDisplayState.noteCount === 0 || cardDisplayState.allExpanded}
             onClick={() => boardModifiers.setAllCardDisplayMode('expanded')}
           >
             <Icon name="lucide-expand" />
@@ -1092,9 +1100,9 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
           </button>
           <button
             className={c('swimlane-card-display-button')}
-            aria-label="Collapse all cards"
-            title="Collapse all cards"
-            disabled={counts.total === 0 || cardDisplayState.allCompact}
+            aria-label="Collapse all notes"
+            title="Collapse all notes"
+            disabled={cardDisplayState.noteCount === 0 || cardDisplayState.allCompact}
             onClick={() => boardModifiers.setAllCardDisplayMode('compact')}
           >
             <Icon name="lucide-minimize-2" />
@@ -1349,6 +1357,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
                     }
                   >
                     <DraggableLane
+                      acceptItemsInLaneArea={true}
                       lane={lane}
                       laneIndex={laneIndex}
                       collapseDir="vertical"

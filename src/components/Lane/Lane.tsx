@@ -36,6 +36,7 @@ const laneAccepts = [DataTypes.Item];
 export interface DraggableLaneProps {
   lane: Lane;
   laneIndex: number;
+  acceptItemsInLaneArea?: boolean;
   isStatic?: boolean;
   collapseDir: 'horizontal' | 'vertical';
   isCollapsed?: boolean;
@@ -49,6 +50,7 @@ function DraggableLaneRaw({
   isStatic,
   lane,
   laneIndex,
+  acceptItemsInLaneArea,
   collapseDir,
   isCollapsed = false,
   renderActions,
@@ -150,6 +152,17 @@ function DraggableLaneRaw({
       data: data,
     };
   }, [isCollapsed, laneIndex, isStatic]);
+  const laneDropData = useMemo(
+    () =>
+      acceptItemsInLaneArea
+        ? {
+            ...lane,
+            accepts: Array.from(new Set([...lane.accepts, DataTypes.Item])),
+            acceptsSort: [DataTypes.Lane],
+          }
+        : lane,
+    [acceptItemsInLaneArea, lane]
+  );
 
   return (
     <SortContext.Provider value={lane.data.sorted ?? null}>
@@ -195,7 +208,7 @@ function DraggableLaneRaw({
                 measureRef={measureRef}
                 id={lane.id}
                 index={laneIndex}
-                data={lane}
+                data={laneDropData}
               >
                 <ScrollContainer
                   className={classcat([c('lane-items'), c('vertical')])}

@@ -49,6 +49,17 @@ export function DragDropApp({ win, plugin }: { win: Window; plugin: KanbanPlugin
         const data = dragEntity.getData();
         const stateManager = plugin.getStateManagerFromViewID(data.viewId, data.win);
         const dropPath = dropEntity.getPath();
+        const dropEntityData = dropEntity.getData();
+        const inDropArea =
+          dropEntityData.acceptsSort && !dropEntityData.acceptsSort.includes(data.type);
+
+        if (inDropArea) {
+          const destinationLane = getEntityFromPath(stateManager.state, dropPath);
+          const insertionMethod =
+            stateManager.getSetting('new-card-insertion-method') || 'append';
+          dropPath.push(insertionMethod === 'append' ? destinationLane.children.length : 0);
+        }
+
         const destinationParent = getEntityFromPath(stateManager.state, dropPath.slice(0, -1));
 
         try {
@@ -106,7 +117,10 @@ export function DragDropApp({ win, plugin }: { win: Window; plugin: KanbanPlugin
         const stateManager = plugin.stateManagers.get(view.file);
 
         if (inDropArea) {
-          dropPath.push(0);
+          const destinationLane = getEntityFromPath(stateManager.state, dropPath);
+          const insertionMethod =
+            stateManager.getSetting('new-card-insertion-method') || 'append';
+          dropPath.push(insertionMethod === 'append' ? destinationLane.children.length : 0);
         }
 
         return stateManager.setState((board) => {

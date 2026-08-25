@@ -23,6 +23,7 @@ import {
   deleteSwimlane,
   getCardConfig,
   getCardId,
+  isLinkedNoteItem,
   renameColumn,
   renameSwimlane,
   reorderColumn,
@@ -463,6 +464,7 @@ export function getBoardModifiers(view: KanbanView, stateManager: StateManager):
     setCardDisplayMode: (path: Path, displayMode: 'compact' | 'preview' | 'expanded') => {
       stateManager.setState((boardData) => {
         const result = ensureItemBlockId(boardData, path);
+        if (!isLinkedNoteItem(result.item)) return boardData;
         const cardConfig = getCardConfig(result.boardData, result.item);
         return touchItem(
           setCardDisplayMode(
@@ -484,6 +486,7 @@ export function getBoardModifiers(view: KanbanView, stateManager: StateManager):
           update(lane, {
             children: {
               $set: lane.children.map((currentItem) => {
+                if (!isLinkedNoteItem(currentItem)) return currentItem;
                 let item = currentItem;
                 if (!item.data.blockId) {
                   item = update(item, {

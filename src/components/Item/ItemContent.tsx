@@ -13,7 +13,7 @@ import {
 import { StateManager } from 'src/StateManager';
 import { useNestedEntityPath } from 'src/dnd/components/Droppable';
 import { Path } from 'src/dnd/types';
-import { getCardConfig } from 'src/helpers/swimlanes';
+import { getCardConfig, isLinkedNoteItem } from 'src/helpers/swimlanes';
 import { getTaskStatusDone, toggleTaskString } from 'src/parsers/helpers/inlineMetadata';
 
 import { MarkdownEditor, allowNewLine } from '../Editor/MarkdownEditor';
@@ -130,6 +130,7 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
   const win = view.getWindow();
   const cardConfig = getCardConfig(stateManager.state, item);
   const mode = cardConfig?.displayMode || 'compact';
+  const hasLinkedNote = isLinkedNoteItem(item);
   const saveTimerRef = useRef<number | null>(null);
   const draftRef = useRef('');
   const lastSavedRef = useRef('');
@@ -161,7 +162,7 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
 
   useEffect(() => {
     let cancelled = false;
-    if (mode === 'compact') {
+    if (mode === 'compact' || !hasLinkedNote) {
       setMarkdown(null);
       setPreviewEditPosition(null);
       return;
@@ -169,12 +170,7 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
 
     if (isStatic) return;
 
-    if (!file) {
-      draftRef.current = item.data.titleRaw;
-      lastSavedRef.current = item.data.titleRaw;
-      setMarkdown(item.data.titleRaw);
-      return;
-    }
+    if (!file) return;
 
     stateManager.app.vault.cachedRead(file).then((content) => {
       if (!cancelled) {
@@ -187,20 +183,16 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
     return () => {
       cancelled = true;
     };
-  }, [file, isStatic, item.data.titleRaw, mode, stateManager]);
+  }, [file, hasLinkedNote, isStatic, mode, stateManager]);
 
   const commitPreviewContent = useCallback(
     (content: string) => {
       if (content === lastSavedRef.current) return;
       lastSavedRef.current = content;
 
-      if (file) {
-        void stateManager.app.vault.modify(file, content);
-      } else {
-        boardModifiers.updateItem(path, stateManager.updateItemContent(item, content));
-      }
+      if (file) void stateManager.app.vault.modify(file, content);
     },
-    [boardModifiers, file, item, path, stateManager]
+    [file, stateManager]
   );
 
   commitRef.current = commitPreviewContent;
@@ -274,7 +266,7 @@ function NotePreview({ item, path, isStatic }: { item: Item; path: Path; isStati
     [boardModifiers, path, size]
   );
 
-  if (mode === 'compact') return null;
+  if (mode === 'compact' || !file) return null;
 
   const previewStyle = {
     '--note-preview-width': `${size.width}px`,

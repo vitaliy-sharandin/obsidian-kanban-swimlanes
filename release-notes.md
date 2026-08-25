@@ -1,5 +1,7 @@
-# Kanban Swimlanes 1.0.7
+# Kanban Swimlanes 1.0.8
 
-- Fixed missing scrolling while editing expanded notes and cards in Obsidian Live Preview.
-- Constrained the CodeMirror editor to the expanded card height so long content scrolls inside the card instead of being clipped.
-- Prevented scroll chaining from the editor to the surrounding board.
+- Limited note display controls and expanded previews to linked-note cards; regular text cards no longer duplicate their content in an expanded panel.
+- Updated **Expand all** and **Collapse all** to affect linked notes only.
+- Made the entire swimlane cell a drop target, so cards and notes can be moved between groups without aiming at an existing card.
+- Applied the configured append/prepend insertion method when dropping into an open cell area.
+- Kept drop targeting active during drag auto-scroll for more reliable placement.

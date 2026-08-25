@@ -5,7 +5,7 @@ import { StateManager } from 'src/StateManager';
 import { addColorMenuItem } from 'src/components/ColorPickerPopover';
 import { Path } from 'src/dnd/types';
 import { moveEntity } from 'src/dnd/util/data';
-import { getCardConfig } from 'src/helpers/swimlanes';
+import { getCardConfig, isLinkedNoteItem } from 'src/helpers/swimlanes';
 import { t } from 'src/lang/helpers';
 
 import { BoardModifiers } from '../../helpers/boardModifiers';
@@ -199,10 +199,10 @@ export function useItemMenu({
         () => boardModifiers.setCardColor(path, '')
       );
 
-      menu
-        .addItem((item) => {
-          const submenu = (item as any)
-            .setTitle('Card display')
+      if (isLinkedNoteItem(item)) {
+        menu.addItem((menuItem) => {
+          const submenu = (menuItem as any)
+            .setTitle('Note display')
             .setIcon('lucide-gallery-vertical-end')
             .setSubmenu();
 
@@ -228,27 +228,28 @@ export function useItemMenu({
                 .setTitle('Expanded')
                 .onClick(() => boardModifiers.setCardDisplayMode(path, 'expanded'))
             );
-        })
-        .addSeparator()
-        .addItem((i) => {
-          i.setIcon('lucide-calendar-check')
-            .setTitle(hasDate ? t('Edit date') : t('Add date'))
-            .onClick(() => {
-              constructDatePicker(
-                e.view,
-                stateManager,
-                coordinates,
-                constructMenuDatePickerOnChange({
-                  stateManager,
-                  boardModifiers,
-                  item,
-                  hasDate,
-                  path,
-                }),
-                item.data.metadata.date?.toDate()
-              );
-            });
         });
+      }
+
+      menu.addSeparator().addItem((i) => {
+        i.setIcon('lucide-calendar-check')
+          .setTitle(hasDate ? t('Edit date') : t('Add date'))
+          .onClick(() => {
+            constructDatePicker(
+              e.view,
+              stateManager,
+              coordinates,
+              constructMenuDatePickerOnChange({
+                stateManager,
+                boardModifiers,
+                item,
+                hasDate,
+                path,
+              }),
+              item.data.metadata.date?.toDate()
+            );
+          });
+      });
 
       if (hasDate) {
         menu.addItem((i) => {

@@ -206,22 +206,20 @@ export class DragManager {
       this.dragPosition
     );
 
-    const isScrolling = this.handleScrollIntersect(
+    this.handleScrollIntersect(
       dragHitbox,
       this.dragEntity,
       scrollHitboxes,
       scrollEntities
     );
 
-    if (!isScrolling) {
-      this.handleHitboxIntersect(
-        dragHitbox,
-        this.dragPosition,
-        this.dragEntity,
-        hitboxHitboxes,
-        hitboxEntities
-      );
-    }
+    this.handleHitboxIntersect(
+      dragHitbox,
+      this.dragPosition,
+      this.dragEntity,
+      hitboxHitboxes,
+      hitboxEntities
+    );
   }
 
   handleScrollIntersect(

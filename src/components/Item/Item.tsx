@@ -12,7 +12,7 @@ import {
 import { Droppable, useNestedEntityPath } from 'src/dnd/components/Droppable';
 import { DndManagerContext } from 'src/dnd/components/context';
 import { useDragHandle } from 'src/dnd/managers/DragManager';
-import { getCardConfig } from 'src/helpers/swimlanes';
+import { getCardConfig, isLinkedNoteItem } from 'src/helpers/swimlanes';
 import { frontmatterKey } from 'src/parsers/common';
 
 import { Icon } from '../Icon/Icon';
@@ -111,6 +111,7 @@ const ItemInner = memo(function ItemInner({
 
   const cardConfig = getCardConfig(stateManager.state, item);
   const displayMode = cardConfig?.displayMode || 'compact';
+  const hasLinkedNote = isLinkedNoteItem(item);
   const setDisplayMode = useCallback(
     (displayMode: 'compact' | 'expanded') => {
       boardModifiers.setCardDisplayMode(path, displayMode);
@@ -142,11 +143,11 @@ const ItemInner = memo(function ItemInner({
           isStatic={isStatic}
         />
         <ItemMenuButton editState={editState} setEditState={setEditState} showMenu={showItemMenu} />
-        {!isEditing(editState) && (
+        {hasLinkedNote && !isEditing(editState) && (
           <div className={c('card-display-controls')} data-ignore-drag={true}>
             {[
               ['compact', 'lucide-minimize-2', 'Compact'],
-              ['expanded', 'lucide-expand', 'Edit expanded'],
+              ['expanded', 'lucide-expand', 'Expand note'],
             ].map(([mode, icon, label]) => (
               <button
                 key={mode}

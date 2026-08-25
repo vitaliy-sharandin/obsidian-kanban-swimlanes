@@ -28,6 +28,10 @@ export function isSwimlaneBoard(board: Board) {
   );
 }
 
+export function isLinkedNoteItem(item: Item) {
+  return !!(item.data.metadata.file || item.data.metadata.fileAccessor);
+}
+
 export function slugId(title: string, fallback: string) {
   const slug = title
     .trim()
