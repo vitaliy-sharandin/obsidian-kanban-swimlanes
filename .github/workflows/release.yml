@@ -2,39 +2,73 @@ name: Release Obsidian plugin
 
 on:
   push:
+    branches:
+      - main
     tags:
       - '*'
+    paths:
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build and publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
-  build:
+  release:
+    name: Build and publish
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '20.x'
 
-      - name: Build plugin
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Check and build plugin
         run: |
-          npm install
           npm run typecheck
           npm run lint
           npm run build
 
       - name: Validate release metadata
+        if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'
         run: |
-          node -e "const m=require('./manifest.json'); const p=require('./package.json'); const tag=process.env.GITHUB_REF_NAME; if (m.version !== p.version || m.version !== tag) { console.error('Release tag, manifest version, and package version must match:', { tag, manifest: m.version, package: p.version }); process.exit(1); }"
+          node -e "const m=require('./manifest.json'); const p=require('./package.json'); const v=require('./versions.json'); const tag=process.env.RELEASE_TAG; if (m.version !== p.version || m.version !== tag || v[m.version] !== m.minAppVersion) { console.error('Release metadata must match the tag:', { tag, manifest: m.version, package: p.version, versions: v[m.version], minAppVersion: m.minAppVersion }); process.exit(1); }"
 
-      - name: Create release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create or update GitHub Release
+        if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag'
         run: |
-          tag="${GITHUB_REF#refs/tags/}"
-
-          gh release create "$tag" \
-            --title="$tag" \
-            --notes-file="release-notes.md" \
-            main.js manifest.json styles.css
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --title "$RELEASE_TAG" \
+              --notes-file release-notes.md
+            gh release upload "$RELEASE_TAG" \
+              main.js manifest.json styles.css \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              --title "$RELEASE_TAG" \
+              --notes-file release-notes.md \
+              main.js manifest.json styles.css
+          fi
