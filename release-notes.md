@@ -1,7 +1,5 @@
-# Kanban Swimlanes 1.0.6
+# Kanban Swimlanes 1.0.7
 
-- Replaced the plain raw Markdown textarea with Obsidian's native CodeMirror Live Preview editor for expanded notes and cards.
-- Double-click rendered content to edit it inline at the selected position.
-- Blur the editor or press **Escape** to save changes and return to the rendered view.
-- Linked-note editing now resolves links and embeds relative to the linked note itself.
-- Kept the editor lazy-loaded so **Expand all** remains responsive.
+- Fixed missing scrolling while editing expanded notes and cards in Obsidian Live Preview.
+- Constrained the CodeMirror editor to the expanded card height so long content scrolls inside the card instead of being clipped.
+- Prevented scroll chaining from the editor to the surrounding board.

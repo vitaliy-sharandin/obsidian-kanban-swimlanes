@@ -1598,30 +1598,34 @@ button.kanban-swimlanes-plugin__new-item-button {
 
 .kanban-swimlanes-plugin__note-preview-editor {
   height: 100%;
+  min-height: 0;
   overflow: hidden;
 
   .markdown-source-view.mod-cm6 {
-    min-height: 100%;
+    min-height: 0;
     height: 100%;
     padding: var(--size-4-2);
     background-color: transparent;
   }
 
   .cm-editor {
-    min-height: 100%;
+    min-height: 0;
     height: 100%;
     background-color: transparent;
   }
 
-  .cm-scroller {
-    min-height: 100%;
+  .markdown-source-view.mod-cm6 .cm-scroller {
+    min-height: 0;
+    height: 100%;
+    overflow: auto;
+    overscroll-behavior: contain;
     font-family: var(--font-text);
   }
 }
 
 .kanban-swimlanes-plugin__note-preview-input {
   width: 100%;
-  min-height: 100%;
+  min-height: 0;
   height: 100%;
 }
 
