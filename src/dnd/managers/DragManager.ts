@@ -206,12 +206,7 @@ export class DragManager {
       this.dragPosition
     );
 
-    this.handleScrollIntersect(
-      dragHitbox,
-      this.dragEntity,
-      scrollHitboxes,
-      scrollEntities
-    );
+    this.handleScrollIntersect(dragHitbox, this.dragEntity, scrollHitboxes, scrollEntities);
 
     this.handleHitboxIntersect(
       dragHitbox,
@@ -324,13 +319,18 @@ export class DragManager {
     const pointerHits: Entity[] = boxIntersect([pointerHitbox], hitboxes)
       .map((match) => hitboxEntities[match[1]])
       .filter((entity) => entity.entityId !== dragEntity.entityId);
+    const sortablePointerHits = pointerHits.filter((entity) => {
+      const { acceptsSort } = entity.getData();
+      return !acceptsSort || acceptsSort.includes(dragEntity.getData().type);
+    });
+    const preferredPointerHits = sortablePointerHits.length ? sortablePointerHits : pointerHits;
     const overlapHits: Entity[] = boxIntersect([dragHitbox], hitboxes).map(
       (match) => hitboxEntities[match[1]]
     );
-    const hits = pointerHits.length ? pointerHits : overlapHits;
+    const hits = preferredPointerHits.length ? preferredPointerHits : overlapHits;
 
-    const primaryIntersection = pointerHits.length
-      ? closestCenter(pointerHits, pointerHitbox)
+    const primaryIntersection = preferredPointerHits.length
+      ? closestCenter(preferredPointerHits, pointerHitbox)
       : getBestIntersect(hits, dragHitbox, dragEntity);
 
     if (this.primaryIntersection && this.primaryIntersection !== primaryIntersection) {

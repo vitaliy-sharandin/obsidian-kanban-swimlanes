@@ -2,15 +2,7 @@ import animateScrollTo from 'animated-scroll-to';
 import classcat from 'classcat';
 import update from 'immutability-helper';
 import type { ComponentChildren } from 'preact';
-import {
-  Fragment,
-  memo,
-  useCallback,
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-} from 'preact/compat';
+import { Fragment, memo, useCallback, useContext, useMemo, useRef, useState } from 'preact/compat';
 import {
   DraggableProps,
   Droppable,
@@ -202,36 +194,66 @@ function DraggableLaneRaw({
               />
             )}
 
-            {!isCollapsed && (
-              <DroppableComponent
-                elementRef={elementRef}
-                measureRef={measureRef}
-                id={lane.id}
-                index={laneIndex}
-                data={laneDropData}
-              >
-                <ScrollContainer
-                  className={classcat([c('lane-items'), c('vertical')])}
+            {!isCollapsed &&
+              (acceptItemsInLaneArea ? (
+                <SortableComponent onSortChange={setIsSorting} axis="vertical">
+                  <DroppableComponent
+                    elementRef={elementRef}
+                    measureRef={measureRef}
+                    id={lane.id}
+                    index={laneIndex}
+                    data={laneDropData}
+                  >
+                    <ScrollContainer
+                      className={classcat([c('lane-items'), c('vertical')])}
+                      id={lane.id}
+                      index={laneIndex}
+                      isStatic={isStatic}
+                      triggerTypes={laneAccepts}
+                    >
+                      <Items
+                        items={lane.children}
+                        isStatic={isStatic}
+                        shouldMarkItemsComplete={shouldMarkItemsComplete}
+                      />
+                      <SortPlaceholder
+                        accepts={laneAccepts}
+                        index={lane.children.length}
+                        isStatic={isStatic}
+                      />
+                    </ScrollContainer>
+                  </DroppableComponent>
+                </SortableComponent>
+              ) : (
+                <DroppableComponent
+                  elementRef={elementRef}
+                  measureRef={measureRef}
                   id={lane.id}
                   index={laneIndex}
-                  isStatic={isStatic}
-                  triggerTypes={laneAccepts}
+                  data={laneDropData}
                 >
-                  <SortableComponent onSortChange={setIsSorting} axis="vertical">
-                    <Items
-                      items={lane.children}
-                      isStatic={isStatic}
-                      shouldMarkItemsComplete={shouldMarkItemsComplete}
-                    />
-                    <SortPlaceholder
-                      accepts={laneAccepts}
-                      index={lane.children.length}
-                      isStatic={isStatic}
-                    />
-                  </SortableComponent>
-                </ScrollContainer>
-              </DroppableComponent>
-            )}
+                  <ScrollContainer
+                    className={classcat([c('lane-items'), c('vertical')])}
+                    id={lane.id}
+                    index={laneIndex}
+                    isStatic={isStatic}
+                    triggerTypes={laneAccepts}
+                  >
+                    <SortableComponent onSortChange={setIsSorting} axis="vertical">
+                      <Items
+                        items={lane.children}
+                        isStatic={isStatic}
+                        shouldMarkItemsComplete={shouldMarkItemsComplete}
+                      />
+                      <SortPlaceholder
+                        accepts={laneAccepts}
+                        index={lane.children.length}
+                        isStatic={isStatic}
+                      />
+                    </SortableComponent>
+                  </ScrollContainer>
+                </DroppableComponent>
+              ))}
 
             {!search?.query &&
               !isCollapsed &&

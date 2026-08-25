@@ -5,6 +5,7 @@ import {
   memo,
   useCallback,
   useContext,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -15,17 +16,26 @@ import { Icon } from 'src/components/Icon/Icon';
 import { DraggableLane } from 'src/components/Lane/Lane';
 import { KanbanContext, SearchContext } from 'src/components/context';
 import { c } from 'src/components/helpers';
-import { Board, ColumnConfig, EditState, Item, SwimlaneConfig } from 'src/components/types';
 import {
-  getCellLane,
+  Board,
+  ColumnConfig,
+  DataTypes,
+  EditState,
+  Item,
+  SwimlaneConfig,
+} from 'src/components/types';
+import { DndManagerContext } from 'src/dnd/components/context';
+import { DragEventData } from 'src/dnd/managers/DragManager';
+import {
   getCardConfig,
+  getCellLane,
   getRenderableColumnConfigs,
   getRenderableSwimlaneConfigs,
   getSwimlaneDepth,
   getSwimlaneDragGroupIds,
-  isLinkedNoteItem,
   isImplicitDefaultColumn,
   isImplicitDefaultSwimlane,
+  isLinkedNoteItem,
   unassignedColumnId,
   unassignedSwimlaneId,
   unassignedTitle,
@@ -49,6 +59,11 @@ type HeaderDragState = {
   offsetY: number;
   orderIds: string[];
   previewSwimlanes?: SwimlaneConfig[];
+};
+
+type ItemDropTarget = {
+  columnId: string;
+  swimlaneId: string;
 };
 
 function areOrdersEqual(a: string[], b: string[]) {
@@ -81,9 +96,7 @@ function getPreviewSwimlaneParentId(
   const target = swimlanes.find((swimlane) => swimlane.id === targetId);
   if (!source || !target || sourceIds.length > 1) return source?.parentId || null;
 
-  const header = root
-    ? getElementByDataValue(root, 'data-kanban-swimlane-id', targetId)
-    : null;
+  const header = root ? getElementByDataValue(root, 'data-kanban-swimlane-id', targetId) : null;
   const rect = header?.getBoundingClientRect() || root?.getBoundingClientRect();
   const nestThreshold = rect ? rect.left + 34 : clientX + 1;
 
@@ -102,9 +115,7 @@ function getPreviewSwimlanes(
 }
 
 function getAnimatedRects(root: HTMLElement) {
-  const elements = Array.from(
-    root.querySelectorAll<HTMLElement>('[data-swimlane-anim-key]')
-  );
+  const elements = Array.from(root.querySelectorAll<HTMLElement>('[data-swimlane-anim-key]'));
   const visualRects = new Map<string, DOMRect>();
   const animatedKeys = new Set<string>();
   const previousTransforms = new Map<HTMLElement, string>();
@@ -113,8 +124,7 @@ function getAnimatedRects(root: HTMLElement) {
     const key = element.dataset.swimlaneAnimKey;
     if (key) {
       visualRects.set(key, element.getBoundingClientRect());
-      const animations =
-        typeof element.getAnimations === 'function' ? element.getAnimations() : [];
+      const animations = typeof element.getAnimations === 'function' ? element.getAnimations() : [];
       if (animations.length) {
         animatedKeys.add(key);
       }
@@ -194,11 +204,7 @@ class TextInputModal extends Modal {
     });
 
     new Setting(contentEl)
-      .addButton((button) =>
-        button
-          .setButtonText('Cancel')
-          .onClick(() => this.close())
-      )
+      .addButton((button) => button.setButtonText('Cancel').onClick(() => this.close()))
       .addButton((button) =>
         button
           .setCta()
@@ -220,7 +226,12 @@ class TextInputModal extends Modal {
   }
 }
 
-function openTextInput(app: App, title: string, initialValue: string, onSubmit: (value: string) => void) {
+function openTextInput(
+  app: App,
+  title: string,
+  initialValue: string,
+  onSubmit: (value: string) => void
+) {
   new TextInputModal(app, title, initialValue, onSubmit).open();
 }
 
@@ -249,12 +260,12 @@ class NoteSuggestModal extends FuzzySuggestModal<TFile> {
 
 export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: SwimlaneBoardProps) {
   const { boardModifiers, stateManager, view } = useContext(KanbanContext);
+  const dndManager = useContext(DndManagerContext);
   const search = useContext(SearchContext);
   const columns = useMemo(() => getRenderableColumnConfigs(boardData), [boardData]);
   const swimlanes = useMemo(() => getRenderableSwimlaneConfigs(boardData), [boardData]);
   const hideColumnHeaders = columns.length === 1 && isImplicitDefaultColumn(columns[0]);
-  const hideSwimlaneHeaders =
-    swimlanes.length === 1 && isImplicitDefaultSwimlane(swimlanes[0]);
+  const hideSwimlaneHeaders = swimlanes.length === 1 && isImplicitDefaultSwimlane(swimlanes[0]);
   const counts = useMemo(() => {
     const columnCounts = new Map<string, number>();
     const swimlaneCounts = new Map<string, number>();
@@ -298,10 +309,69 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
     };
   }, [boardData]);
   const [dragState, setDragState] = useState<HeaderDragState | null>(null);
+  const [itemDropTarget, setItemDropTarget] = useState<ItemDropTarget | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const layoutRectsRef = useRef<Map<string, DOMRect> | null>(null);
   const dragStartRectsRef = useRef<Map<string, DOMRect> | null>(null);
   const dragOrderKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!dndManager) return;
+
+    const getItemDropTarget = ({
+      dragEntity,
+      primaryIntersection,
+    }: DragEventData): ItemDropTarget | null => {
+      if (
+        dragEntity?.getData().type !== DataTypes.Item ||
+        !primaryIntersection ||
+        primaryIntersection.scopeId !== view.id
+      ) {
+        return null;
+      }
+
+      const laneIndex = primaryIntersection.getPath()[0];
+      const lane = boardData.children[laneIndex];
+      if (!lane?.data.isSwimlaneCell || !lane.data.columnId || !lane.data.swimlaneId) {
+        return null;
+      }
+
+      return {
+        columnId: lane.data.columnId,
+        swimlaneId: lane.data.swimlaneId,
+      };
+    };
+
+    const handleDragEnter = (event: DragEventData) => {
+      setItemDropTarget(getItemDropTarget(event));
+    };
+    const handleDragLeave = (event: DragEventData) => {
+      const leavingTarget = getItemDropTarget(event);
+      setItemDropTarget((currentTarget) => {
+        if (
+          !leavingTarget ||
+          (currentTarget?.columnId === leavingTarget.columnId &&
+            currentTarget.swimlaneId === leavingTarget.swimlaneId)
+        ) {
+          return null;
+        }
+        return currentTarget;
+      });
+    };
+    const clearItemDropTarget = () => setItemDropTarget(null);
+
+    dndManager.emitter.on('dragStart', clearItemDropTarget);
+    dndManager.emitter.on('dragEnter', handleDragEnter);
+    dndManager.emitter.on('dragLeave', handleDragLeave);
+    dndManager.emitter.on('dragEnd', clearItemDropTarget);
+
+    return () => {
+      dndManager.emitter.off('dragStart', clearItemDropTarget);
+      dndManager.emitter.off('dragEnter', handleDragEnter);
+      dndManager.emitter.off('dragLeave', handleDragLeave);
+      dndManager.emitter.off('dragEnd', clearItemDropTarget);
+    };
+  }, [boardData, dndManager, view.id]);
   const headerDragRef = useRef<{
     type: HeaderDragType;
     sourceId: string;
@@ -427,7 +497,11 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
       const key = element.dataset.swimlaneAnimKey;
       if (!key) return;
 
-      if (dragState && sourceStartRects && isDragSourceKey(key, dragState.type, dragState.sourceIds)) {
+      if (
+        dragState &&
+        sourceStartRects &&
+        isDragSourceKey(key, dragState.type, dragState.sourceIds)
+      ) {
         const startRect = sourceStartRects.get(key);
         const nextRect = rects.get(key);
         if (startRect && nextRect) {
@@ -560,7 +634,10 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
     (event: MouseEvent, swimlane: SwimlaneConfig) => {
       const swimlaneGroupIds = new Set(getSwimlaneDragGroupIds(swimlanes, swimlane.id));
       const hasCards = boardData.children.some(
-        (lane) => lane.data.swimlaneId && swimlaneGroupIds.has(lane.data.swimlaneId) && lane.children.length > 0
+        (lane) =>
+          lane.data.swimlaneId &&
+          swimlaneGroupIds.has(lane.data.swimlaneId) &&
+          lane.children.length > 0
       );
       const menu = new Menu()
         .addItem((item) =>
@@ -664,16 +741,10 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
     (event: MouseEvent) => {
       new Menu()
         .addItem((item) =>
-          item
-            .setIcon('lucide-rows-3')
-            .setTitle('Add swimlane')
-            .onClick(addSwimlane)
+          item.setIcon('lucide-rows-3').setTitle('Add swimlane').onClick(addSwimlane)
         )
         .addItem((item) =>
-          item
-            .setIcon('lucide-columns-3')
-            .setTitle('Add column')
-            .onClick(addColumn)
+          item.setIcon('lucide-columns-3').setTitle('Add column').onClick(addColumn)
         )
         .showAtMouseEvent(event);
     },
@@ -702,10 +773,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
       setEditState: (editState: EditState) => void;
     }) => (
       <div className={c('swimlane-cell-actions')}>
-        <button
-          className={c('swimlane-cell-action')}
-          onClick={() => setEditState({ x: 0, y: 0 })}
-        >
+        <button className={c('swimlane-cell-action')} onClick={() => setEditState({ x: 0, y: 0 })}>
           <span className={c('item-button-plus')}>+</span> Add card
         </button>
         <button className={c('swimlane-cell-action')} onClick={() => openNoteSearch(addItems)}>
@@ -730,10 +798,8 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
 
   const getCellDragClasses = useCallback(
     (columnId: string, swimlaneId: string) => ({
-      'is-column-drag-source':
-        dragState?.type === 'column' && dragState.sourceId === columnId,
-      'is-column-drop-target':
-        dragState?.type === 'column' && dragState.targetId === columnId,
+      'is-column-drag-source': dragState?.type === 'column' && dragState.sourceId === columnId,
+      'is-column-drop-target': dragState?.type === 'column' && dragState.targetId === columnId,
       'is-column-drop-before':
         dragState?.type === 'column' &&
         dragState.targetId === columnId &&
@@ -872,7 +938,10 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
         const drag = headerDragRef.current;
         if (!drag || drag.pointerId !== moveEvent.pointerId) return;
 
-        const distance = Math.hypot(moveEvent.clientX - drag.startX, moveEvent.clientY - drag.startY);
+        const distance = Math.hypot(
+          moveEvent.clientX - drag.startX,
+          moveEvent.clientY - drag.startY
+        );
         if (isTouchPointer && !touchDragReady) {
           if (distance > 8) {
             win.clearTimeout(longPressTimeout);
@@ -901,11 +970,9 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
             ? drag.sourceRect.left + drag.sourceRect.width / 2 + drag.offsetX
             : drag.sourceRect.top + drag.sourceRect.height / 2 + drag.offsetY
           : drag.type === 'column'
-          ? moveEvent.clientX
-          : moveEvent.clientY;
-        const frameElements = Array.from(
-          win.document.querySelectorAll<HTMLElement>(frameSelector)
-        );
+            ? moveEvent.clientX
+            : moveEvent.clientY;
+        const frameElements = Array.from(win.document.querySelectorAll<HTMLElement>(frameSelector));
         const target = frameElements.find((element) => {
           const id = element.getAttribute(frameAttribute);
           const rect =
@@ -1173,6 +1240,7 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
                 'is-implicit-hidden': hideSwimlaneHeaders && isImplicitDefaultSwimlane(swimlane),
                 'is-sub-swimlane': (swimlaneDepths.get(swimlane.id) || 0) > 0,
                 'has-sub-swimlanes': swimlaneChildCounts.has(swimlane.id),
+                'is-item-drop-target': itemDropTarget?.swimlaneId === swimlane.id,
                 ...getHeaderDragClasses('swimlane', swimlane.id),
               },
             ])}
@@ -1343,6 +1411,9 @@ export const SwimlaneBoard = memo(function SwimlaneBoard({ boardData }: Swimlane
                         'has-column-color': column.color,
                         'is-sub-swimlane': (swimlaneDepths.get(swimlane.id) || 0) > 0,
                         'has-sub-swimlanes': swimlaneChildCounts.has(swimlane.id),
+                        'is-item-drop-target':
+                          itemDropTarget?.columnId === column.id &&
+                          itemDropTarget.swimlaneId === swimlane.id,
                         ...getCellDragClasses(column.id, swimlane.id),
                       },
                     ])}

@@ -520,24 +520,24 @@ button.kanban-swimlanes-plugin__search-cancel-button .kanban-swimlanes-plugin__i
     color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 26%, transparent);
   border-radius: 14px;
   pointer-events: none;
-  background:
-    linear-gradient(
+  background: linear-gradient(
       to right,
       color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 8%, transparent),
       color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 3%, transparent)
     ),
     color-mix(in srgb, var(--background-secondary) 10%, transparent);
   box-shadow:
-    inset 3px 0 0 color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 50%, transparent),
+    inset 3px 0 0
+      color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 50%, transparent),
     0 8px 24px color-mix(in srgb, var(--background-primary) 18%, transparent);
 }
 
 .kanban-swimlanes-plugin__swimlane-column-frame {
   border: 1px solid
     color-mix(in srgb, var(--column-color, var(--background-modifier-border)) 34%, transparent);
-  border-top: 3px solid color-mix(in srgb, var(--column-color, var(--background-modifier-border)) 76%, transparent);
-  background:
-    linear-gradient(
+  border-top: 3px solid
+    color-mix(in srgb, var(--column-color, var(--background-modifier-border)) 76%, transparent);
+  background: linear-gradient(
       to bottom,
       color-mix(in srgb, var(--column-color, var(--background-modifier-border)) 15%, transparent),
       color-mix(in srgb, var(--column-color, var(--background-modifier-border)) 6%, transparent)
@@ -550,12 +550,11 @@ button.kanban-swimlanes-plugin__search-cancel-button .kanban-swimlanes-plugin__i
     color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 30%, transparent);
   border-left: 4px solid
     color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 76%, transparent);
-  background:
-    linear-gradient(
-      to right,
-      color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 14%, transparent),
-      color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 5%, transparent)
-    );
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 14%, transparent),
+    color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 5%, transparent)
+  );
 }
 
 .kanban-swimlanes-plugin__swimlane-row-frame.has-sub-swimlanes {
@@ -564,24 +563,32 @@ button.kanban-swimlanes-plugin__search-cancel-button .kanban-swimlanes-plugin__i
   border-right-color: transparent;
   border-bottom-color: transparent;
   border-radius: 12px 0 0 12px;
-  background:
-    linear-gradient(
-      to right,
-      color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 10%, transparent),
-      transparent 46%
-    );
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 10%, transparent),
+    transparent 46%
+  );
 }
 
 .kanban-swimlanes-plugin__swimlane-row-frame.is-sub-swimlane {
   margin-inline-start: calc(14px + (var(--swimlane-depth, 0) * 10px));
   border-left-width: 2px;
   border-radius: 10px;
-  background:
-    linear-gradient(
-      to right,
-      color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 10%, transparent),
-      color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 3%, transparent)
-    );
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 10%, transparent),
+    color-mix(in srgb, var(--swimlane-color, var(--background-modifier-border)) 3%, transparent)
+  );
+}
+
+.kanban-swimlanes-plugin__swimlane-row-frame.is-item-drop-target {
+  z-index: 3;
+  outline: 2px solid color-mix(in srgb, var(--interactive-accent) 88%, transparent);
+  outline-offset: -3px;
+  background-color: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 26%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--interactive-accent) 8%, transparent);
 }
 
 .kanban-swimlanes-plugin__swimlane-board.is-columns-only
@@ -676,8 +683,7 @@ button.kanban-swimlanes-plugin__search-cancel-button .kanban-swimlanes-plugin__i
 .kanban-swimlanes-plugin__swimlane-add-swimlane-button {
   border: 1px dashed color-mix(in srgb, var(--background-modifier-border) 48%, transparent);
   border-radius: 8px;
-  background:
-    linear-gradient(
+  background: linear-gradient(
       to bottom,
       color-mix(in srgb, var(--interactive-accent) 5%, transparent),
       transparent
@@ -752,14 +758,19 @@ button.kanban-swimlanes-plugin__search-cancel-button .kanban-swimlanes-plugin__i
   transform: none;
 }
 
-.kanban-swimlanes-plugin__swimlane-grid > .kanban-swimlanes-plugin__swimlane-add-column-button:hover,
-.kanban-swimlanes-plugin__swimlane-grid > .kanban-swimlanes-plugin__swimlane-add-column-button:focus-visible,
-.kanban-swimlanes-plugin__swimlane-grid > .kanban-swimlanes-plugin__swimlane-add-swimlane-button:hover,
-.kanban-swimlanes-plugin__swimlane-grid > .kanban-swimlanes-plugin__swimlane-add-swimlane-button:focus-visible {
+.kanban-swimlanes-plugin__swimlane-grid
+  > .kanban-swimlanes-plugin__swimlane-add-column-button:hover,
+.kanban-swimlanes-plugin__swimlane-grid
+  > .kanban-swimlanes-plugin__swimlane-add-column-button:focus-visible,
+.kanban-swimlanes-plugin__swimlane-grid
+  > .kanban-swimlanes-plugin__swimlane-add-swimlane-button:hover,
+.kanban-swimlanes-plugin__swimlane-grid
+  > .kanban-swimlanes-plugin__swimlane-add-swimlane-button:focus-visible {
   opacity: 1;
 }
 
-.kanban-swimlanes-plugin__swimlane-board.is-swimlanes-only .kanban-swimlanes-plugin__swimlane-add-column-button {
+.kanban-swimlanes-plugin__swimlane-board.is-swimlanes-only
+  .kanban-swimlanes-plugin__swimlane-add-column-button {
   min-height: 80px;
 }
 
@@ -890,12 +901,17 @@ button.kanban-swimlanes-plugin__swimlane-row-header:focus-visible {
   transition: opacity 120ms ease;
 }
 
-.kanban-swimlanes-plugin__swimlane-column-header:hover .kanban-swimlanes-plugin__swimlane-header-grip,
+.kanban-swimlanes-plugin__swimlane-column-header:hover
+  .kanban-swimlanes-plugin__swimlane-header-grip,
 .kanban-swimlanes-plugin__swimlane-row-header:hover .kanban-swimlanes-plugin__swimlane-header-grip,
-.kanban-swimlanes-plugin__swimlane-column-header:focus-visible .kanban-swimlanes-plugin__swimlane-header-grip,
-.kanban-swimlanes-plugin__swimlane-row-header:focus-visible .kanban-swimlanes-plugin__swimlane-header-grip,
-.kanban-swimlanes-plugin__swimlane-column-header.is-drag-source .kanban-swimlanes-plugin__swimlane-header-grip,
-.kanban-swimlanes-plugin__swimlane-row-header.is-drag-source .kanban-swimlanes-plugin__swimlane-header-grip {
+.kanban-swimlanes-plugin__swimlane-column-header:focus-visible
+  .kanban-swimlanes-plugin__swimlane-header-grip,
+.kanban-swimlanes-plugin__swimlane-row-header:focus-visible
+  .kanban-swimlanes-plugin__swimlane-header-grip,
+.kanban-swimlanes-plugin__swimlane-column-header.is-drag-source
+  .kanban-swimlanes-plugin__swimlane-header-grip,
+.kanban-swimlanes-plugin__swimlane-row-header.is-drag-source
+  .kanban-swimlanes-plugin__swimlane-header-grip {
   opacity: 1;
 }
 
@@ -983,6 +999,11 @@ button.kanban-swimlanes-plugin__swimlane-row-header:focus-visible {
     background-color: transparent;
   }
 
+  &.is-item-drop-target {
+    outline-color: color-mix(in srgb, var(--interactive-accent) 88%, transparent);
+    background-color: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  }
+
   > .kanban-swimlanes-plugin__lane-wrapper {
     position: relative;
     z-index: 1;
@@ -1016,8 +1037,7 @@ button.kanban-swimlanes-plugin__swimlane-row-header:focus-visible {
     border: 0;
     border-left: 3px solid color-mix(in srgb, var(--card-color, transparent) 52%, transparent);
     border-radius: 5px;
-    background:
-      linear-gradient(
+    background: linear-gradient(
         to right,
         color-mix(in srgb, var(--card-color, transparent) 10%, transparent),
         transparent 42%
@@ -1027,8 +1047,7 @@ button.kanban-swimlanes-plugin__swimlane-row-header:focus-visible {
   }
 
   .kanban-swimlanes-plugin__item:hover {
-    background:
-      linear-gradient(
+    background: linear-gradient(
         to right,
         color-mix(in srgb, var(--card-color, transparent) 14%, transparent),
         transparent 46%
@@ -1038,8 +1057,7 @@ button.kanban-swimlanes-plugin__swimlane-row-header:focus-visible {
 
   .kanban-swimlanes-plugin__note-preview-card {
     border-top-color: color-mix(in srgb, var(--background-modifier-border) 45%, transparent);
-    background:
-      linear-gradient(
+    background: linear-gradient(
         to right,
         color-mix(in srgb, var(--card-color, transparent) 14%, transparent),
         transparent 46%
@@ -1122,12 +1140,11 @@ button.kanban-swimlanes-plugin__swimlane-row-header:focus-visible {
   align-items: end;
   opacity: 0;
   transform: translateY(4px);
-  background:
-    linear-gradient(
-      to top,
-      color-mix(in srgb, var(--background-primary) 10%, transparent),
-      transparent
-    );
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--background-primary) 10%, transparent),
+    transparent
+  );
   transition:
     opacity 120ms ease,
     transform 120ms ease,
@@ -1424,7 +1441,8 @@ div.kanban-swimlanes-plugin__lane-title-count.wip-exceeded {
   gap: 4px;
 }
 
-button.kanban-swimlanes-plugin__lane-settings-button + button.kanban-swimlanes-plugin__lane-settings-button {
+button.kanban-swimlanes-plugin__lane-settings-button
+  + button.kanban-swimlanes-plugin__lane-settings-button {
   margin-inline-start: 2px;
 }
 
@@ -1460,7 +1478,9 @@ button.kanban-swimlanes-plugin__lane-settings-button + button.kanban-swimlanes-p
   }
 }
 
-.is-sorting .kanban-swimlanes-plugin__lane-items > .kanban-swimlanes-plugin__placeholder:only-child {
+.is-sorting
+  .kanban-swimlanes-plugin__lane-items
+  > .kanban-swimlanes-plugin__placeholder:only-child {
   border-color: hsla(var(--interactive-accent-hsl), 0.6);
 }
 
@@ -1553,7 +1573,9 @@ button.kanban-swimlanes-plugin__new-item-button {
   background-color: var(--interactive-accent-hover);
 }
 
-.kanban-swimlanes-plugin__drag-container > .kanban-swimlanes-plugin__item-wrapper .kanban-swimlanes-plugin__item {
+.kanban-swimlanes-plugin__drag-container
+  > .kanban-swimlanes-plugin__item-wrapper
+  .kanban-swimlanes-plugin__item {
   border-color: var(--interactive-accent);
   box-shadow:
     var(--shadow-s),
@@ -1636,15 +1658,14 @@ button.kanban-swimlanes-plugin__new-item-button {
   width: 16px;
   height: 16px;
   cursor: nwse-resize;
-  background:
-    linear-gradient(
-      135deg,
-      transparent 0 50%,
-      var(--text-faint) 50% 60%,
-      transparent 60% 70%,
-      var(--text-faint) 70% 80%,
-      transparent 80%
-    );
+  background: linear-gradient(
+    135deg,
+    transparent 0 50%,
+    var(--text-faint) 50% 60%,
+    transparent 60% 70%,
+    var(--text-faint) 70% 80%,
+    transparent 80%
+  );
 }
 
 .kanban-swimlanes-plugin__item-content-wrapper {
@@ -1844,7 +1865,8 @@ button.kanban-swimlanes-plugin__new-item-button {
   border-radius: var(--radius-s);
 }
 
-.kanban-swimlanes-plugin__table-cell-wrapper .kanban-swimlanes-plugin__item-task-inline-metadata-item {
+.kanban-swimlanes-plugin__table-cell-wrapper
+  .kanban-swimlanes-plugin__item-task-inline-metadata-item {
   background-color: unset;
   padding-inline: unset;
   border-radius: unset;
@@ -2210,7 +2232,9 @@ button.kanban-swimlanes-plugin__cancel-action-button {
   flex-direction: column;
 }
 
-.kanban-swimlanes-plugin__board-settings-modal .choices__list--dropdown .choices__item--selectable:after {
+.kanban-swimlanes-plugin__board-settings-modal
+  .choices__list--dropdown
+  .choices__item--selectable:after {
   display: none;
 }
 
@@ -2219,7 +2243,9 @@ button.kanban-swimlanes-plugin__cancel-action-button {
   padding-inline: 6px;
 }
 
-.kanban-swimlanes-plugin__board-settings-modal .choices__list--dropdown .choices__item.is-highlighted {
+.kanban-swimlanes-plugin__board-settings-modal
+  .choices__list--dropdown
+  .choices__item.is-highlighted {
   background-color: var(--background-primary-alt);
 }
 
@@ -2266,7 +2292,10 @@ button.kanban-swimlanes-plugin__cancel-action-button {
   border-bottom-color: var(--text-normal);
 }
 
-.kanban-swimlanes-plugin__date-picker .flatpickr-current-month .numInputWrapper span.arrowDown:after {
+.kanban-swimlanes-plugin__date-picker
+  .flatpickr-current-month
+  .numInputWrapper
+  span.arrowDown:after {
   border-top-color: var(--text-normal);
 }
 
